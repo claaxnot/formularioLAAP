@@ -1549,6 +1549,63 @@ body {
 }
 
 @media (max-width: 640px) {
+  /* Barra de Navegación Compacta Móvil */
+  .laap-navbar {
+    padding: 8px 12px !important;
+  }
+  
+  .laap-navbar-brand {
+    gap: 8px !important;
+  }
+  
+  .laap-logo-wrapper {
+    padding: 4px !important;
+  }
+  
+  .laap-logo-wrapper img {
+    height: 24px !important;
+    width: 24px !important;
+  }
+  
+  .laap-brand-title {
+    font-size: 0.85rem !important;
+    letter-spacing: 0 !important;
+    line-height: 1.1 !important;
+  }
+  
+  .laap-brand-subtitle {
+    font-size: 0.6rem !important;
+  }
+  
+  .laap-navbar-user {
+    gap: 8px !important;
+  }
+  
+  .laap-user-info {
+    align-items: flex-end !important;
+  }
+  
+  .laap-user-name {
+    font-size: 0.8rem !important;
+    max-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .laap-user-detail {
+    display: none !important; /* Ocultar rol/curso en navbar móvil para evitar superposición */
+  }
+  
+  .laap-btn-logout {
+    padding: 6px 8px !important;
+    gap: 0 !important;
+  }
+  
+  .laap-btn-logout .logout-text {
+    display: none !important; /* Ocultar texto 'Salir' en móviles */
+  }
+
   /* 1. Contenedor y Gaps en Grilla Móvil */
   .electives-grid {
     grid-template-columns: 1fr !important;

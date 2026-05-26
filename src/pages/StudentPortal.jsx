@@ -404,26 +404,32 @@ export default function StudentPortal() {
   const handleSelectModalidad = async (selectedMod) => {
     setSavingModalidad(true);
     try {
-      // Intentar guardar en Supabase
-      const { error } = await supabase
-        .from('elecciones_modalidad')
-        .insert([{
-          alumno_id: profile.id,
-          modalidad: selectedMod
-        }]);
+      const isDemo = !!localStorage.getItem('laap_mock_session');
+      
+      if (!isDemo) {
+        // Intentar guardar en Supabase en entornos reales
+        const { error } = await supabase
+          .from('elecciones_modalidad')
+          .insert([{
+            alumno_id: profile.id,
+            modalidad: selectedMod
+          }]);
 
-      if (error) {
-        console.warn("No se pudo insertar en la tabla elecciones_modalidad (puede no existir aún). Se guardará en fallback local:", error);
+        if (error) {
+          throw new Error(error.message);
+        }
+      } else {
+        console.log("[Demo Mode] Omitiendo guardado en base de datos real.");
       }
       
-      // Siempre persistir en localStorage para fallback/offline robustness
+      // Siempre persistir en localStorage para robustez del navegador
       localStorage.setItem(`modalidad_${profile.id}`, selectedMod);
       
       setModalidad(selectedMod);
-      showToast("Modalidad guardada exitosamente.", "success");
+      showToast("Modalidad registrada y guardada exitosamente.", "success");
     } catch (err) {
-      console.error(err);
-      showToast("Error al guardar modalidad: " + err.message, "error");
+      console.error("Error al registrar modalidad:", err);
+      showToast("No se pudo registrar en el servidor: " + err.message, "error");
     } finally {
       setSavingModalidad(false);
       setPendingModalidad(null);
