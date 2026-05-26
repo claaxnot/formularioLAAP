@@ -1072,22 +1072,8 @@ export default function StudentPortal() {
               </div>
 
               {timeLeft && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '8px',
-                  backgroundColor: timeLeft.includes('expirada') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                  border: timeLeft.includes('expirada') ? '1px solid #ef4444' : '1px solid #f59e0b',
-                  color: timeLeft.includes('expirada') ? '#ef4444' : '#f59e0b',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                  fontSize: '12.5px',
-                  fontWeight: 'bold',
-                  marginBottom: '16px',
-                  animation: 'laap-pulse 2s infinite'
-                }}>
-                  <Clock size={15} />
+                <div className={`summary-countdown-banner ${timeLeft.includes('expirada') ? 'expired' : ''}`}>
+                  <Clock size={14} style={{ flexShrink: 0 }} />
                   <span>{timeLeft}</span>
                 </div>
               )}

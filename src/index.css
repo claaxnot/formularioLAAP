@@ -1816,6 +1816,7 @@ body {
     border-top: 2px solid rgba(255, 255, 255, 0.1);
     background: rgba(15, 23, 42, 0.95) !important;
     backdrop-filter: blur(12px) !important;
+    box-sizing: border-box !important;
   }
 
   .selection-summary-panel .panel-title {
@@ -1825,6 +1826,14 @@ body {
     letter-spacing: 0.5px;
     display: flex;
     justify-content: center;
+  }
+
+  .summary-countdown-banner {
+    padding: 4px 10px !important;
+    font-size: 0.68rem !important;
+    margin-bottom: 6px !important;
+    gap: 4px !important;
+    border-radius: 6px !important;
   }
 
   .summary-cards {
@@ -1874,10 +1883,37 @@ body {
 
   /* 8. Padding de compensación inferior para no tapar los electivos */
   .portal-selection-form {
-    padding-bottom: 180px !important;
+    padding-bottom: 240px !important;
   }
 }
 
+/* Banner de cuenta regresiva */
+.summary-countdown-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background-color: rgba(245, 158, 11, 0.12);
+  border: 1px solid #f59e0b;
+  color: #fbbf24;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  animation: laap-pulse 2s infinite;
+}
+
+.summary-countdown-banner.expired {
+  background-color: rgba(239, 68, 68, 0.12);
+  border-color: #ef4444;
+  color: #f87171;
+}
+
+@keyframes laap-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(0.98); }
+}
 
 /* Animations for premium global toast */
 @keyframes laap-toast-slide-in {
