@@ -916,42 +916,116 @@ export default function AdminDashboard() {
             {/* Ocupación por Electivos */}
             <div className="admin-section-card">
               <h2>Monitoreo de Vacantes por Asignatura</h2>
-              <p>Capacidad real y demanda inmediata de cada electivo.</p>
+              <p style={{ marginBottom: '24px' }}>Capacidad real y demanda inmediata de cada electivo por nivel.</p>
 
-              <div className="stats-electives-list">
-                {(() => {
-                  const statsCuposFiltered = cupos.filter(c => {
-                    const el = electives.find(e => e.id === c.electivo_id || e.id === c.id);
-                    if (statsFilter === 'all') return true;
-                    return el?.nivel_destino === statsFilter;
-                  });
+              <div className="monitoreo-columnas-container" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
+                gap: '24px'
+              }}>
+                {/* COLUMNA 1: 3° MEDIO */}
+                <div className="monitoreo-columna">
+                  <h3 style={{
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    color: '#60a5fa',
+                    borderBottom: '2px solid rgba(59, 130, 246, 0.15)',
+                    paddingBottom: '8px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <BookOpen size={16} />
+                    Asignaturas 3° Medio (3M)
+                  </h3>
+                  <div className="stats-electives-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {(() => {
+                      const electives3M = cupos.filter(c => {
+                        const el = electives.find(e => e.id === c.electivo_id || e.id === c.id);
+                        return el?.nivel_destino === '3M';
+                      });
 
-                  if (statsCuposFiltered.length === 0) {
-                    return <div style={{ textAlign: 'center', padding: '24px', color: '#9ca3af' }}>No hay registros disponibles.</div>;
-                  }
+                      if (electives3M.length === 0) {
+                        return <div style={{ textAlign: 'center', padding: '16px', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>No hay registros para 3M.</div>;
+                      }
 
-                  return statsCuposFiltered.map(el => {
-                    const percent = el.cupos_maximos > 0 ? Math.round((el.cupos_ocupados / el.cupos_maximos) * 100) : 0;
-                    const order = el.horario_orden || 1;
-                    return (
-                      <div key={el.electivo_id || el.id} className="stat-elective-row" style={{ borderLeft: `6px solid ${String(order) === '1' ? '#d97706' : String(order) === '2' ? '#db2777' : '#2563eb'}` }}>
-                        <div className="stat-el-info">
-                          <strong>{el.nombre}</strong>
-                          <span className="stat-el-sub">
-                            {el.horario_nombre || `Horario ${order}`} | Área {el.area_codigo || 'A'} | Profesor {el.profesor || el.docente || 'Docente UTP'}
-                          </span>
-                        </div>
+                      return electives3M.map(el => {
+                        const percent = el.cupos_maximos > 0 ? Math.round((el.cupos_ocupados / el.cupos_maximos) * 100) : 0;
+                        const order = el.horario_orden || 1;
+                        return (
+                          <div key={el.electivo_id || el.id} className="stat-elective-row" style={{ borderLeft: `5px solid ${String(order) === '1' ? '#d97706' : String(order) === '2' ? '#db2777' : '#2563eb'}`, padding: '12px 16px', margin: 0 }}>
+                            <div className="stat-el-info">
+                              <strong style={{ fontSize: '13.5px' }}>{el.nombre}</strong>
+                              <span className="stat-el-sub" style={{ fontSize: '11px', marginTop: '2px' }}>
+                                {el.horario_nombre || `Horario ${order}`} | Área {el.area_codigo || 'A'} | {el.profesor || el.docente || 'Docente UTP'}
+                              </span>
+                            </div>
 
-                        <div className="stat-el-progress-col">
-                          <div className="stat-progress-bar-container">
-                            <div className={`stat-progress-bar ${percent >= 100 ? 'full' : ''}`} style={{ width: `${percent}%` }} />
+                            <div className="stat-el-progress-col" style={{ width: '100%', gap: '10px', marginTop: '8px' }}>
+                              <div className="stat-progress-bar-container" style={{ height: '8px' }}>
+                                <div className={`stat-progress-bar ${percent >= 100 ? 'full' : ''}`} style={{ width: `${percent}%` }} />
+                              </div>
+                              <span className="stat-percent-text" style={{ fontSize: '11.5px', minWidth: '75px' }}>{el.cupos_ocupados} / {el.cupos_maximos} ({percent}%)</span>
+                            </div>
                           </div>
-                          <span className="stat-percent-text">{el.cupos_ocupados} / {el.cupos_maximos} ({percent}%)</span>
-                        </div>
-                      </div>
-                    );
-                  });
-                })()}
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                {/* COLUMNA 2: 4° MEDIO */}
+                <div className="monitoreo-columna">
+                  <h3 style={{
+                    fontSize: '15px',
+                    fontWeight: 'bold',
+                    color: '#10b981',
+                    borderBottom: '2px solid rgba(16, 185, 129, 0.15)',
+                    paddingBottom: '8px',
+                    marginBottom: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <GraduationCap size={16} style={{ color: '#10b981' }} />
+                    Asignaturas 4° Medio (4M)
+                  </h3>
+                  <div className="stats-electives-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {(() => {
+                      const electives4M = cupos.filter(c => {
+                        const el = electives.find(e => e.id === c.electivo_id || e.id === c.id);
+                        return el?.nivel_destino === '4M';
+                      });
+
+                      if (electives4M.length === 0) {
+                        return <div style={{ textAlign: 'center', padding: '16px', color: '#9ca3af', fontSize: '13px', fontStyle: 'italic' }}>No hay registros para 4M.</div>;
+                      }
+
+                      return electives4M.map(el => {
+                        const percent = el.cupos_maximos > 0 ? Math.round((el.cupos_ocupados / el.cupos_maximos) * 100) : 0;
+                        const order = el.horario_orden || 1;
+                        return (
+                          <div key={el.electivo_id || el.id} className="stat-elective-row" style={{ borderLeft: `5px solid ${String(order) === '1' ? '#d97706' : String(order) === '2' ? '#db2777' : '#2563eb'}`, padding: '12px 16px', margin: 0 }}>
+                            <div className="stat-el-info">
+                              <strong style={{ fontSize: '13.5px' }}>{el.nombre}</strong>
+                              <span className="stat-el-sub" style={{ fontSize: '11px', marginTop: '2px' }}>
+                                {el.horario_nombre || `Horario ${order}`} | Área {el.area_codigo || 'A'} | {el.profesor || el.docente || 'Docente UTP'}
+                              </span>
+                            </div>
+
+                            <div className="stat-el-progress-col" style={{ width: '100%', gap: '10px', marginTop: '8px' }}>
+                              <div className="stat-progress-bar-container" style={{ height: '8px' }}>
+                                <div className={`stat-progress-bar ${percent >= 100 ? 'full' : ''}`} style={{ width: `${percent}%` }} />
+                              </div>
+                              <span className="stat-percent-text" style={{ fontSize: '11.5px', minWidth: '75px' }}>{el.cupos_ocupados} / {el.cupos_maximos} ({percent}%)</span>
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
