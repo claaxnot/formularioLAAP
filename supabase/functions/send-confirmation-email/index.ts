@@ -168,6 +168,9 @@ serve(async (req) => {
       throw new Error("No se ha configurado la variable de entorno RESEND_API_KEY en Supabase.");
     }
 
+    // Consultar remitente desde variables de entorno o usar fallback por defecto
+    const emailSender = Deno.env.get('EMAIL_FROM') || 'Liceo Arturo Alessandri Palma <no-reply@resend.dev>';
+
     // Envío del correo vía API REST de Resend
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -176,7 +179,7 @@ serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`
       },
       body: JSON.stringify({
-        from: 'Liceo Arturo Alessandri Palma <no-reply@resend.dev>',
+        from: emailSender,
         to: toEmails,
         subject: 'Confirmación de elección académica - Liceo Arturo Alessandri Palma',
         html: emailHtml
