@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import Navbar from '../components/Navbar';
 import { formatNombre } from '../utils/formatters';
+import * as XLSX from 'xlsx';
 import {
   BarChart3,
   Users,
@@ -503,78 +504,154 @@ export default function AdminDashboard() {
     setShowModal(true);
   };
 
-  // Exportar a CSV cruzando datos reales
-  const handleExportCSV = () => {
-    const rosterRows = students.map(st => {
-      const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
+  // Exportar reporte de Roster por nivel (3M o 4M) a formato Excel (.xlsx) con múltiples pestañas
+  const handleExportExcel = (nivelDestino) => {
+    try {
+      const wb = XLSX.utils.book_new();
 
-      const h1Id = stPosts.find(p => String(p.horario_id) === '1')?.electivo_id;
-      const h2Id = stPosts.find(p => String(p.horario_id) === '2')?.electivo_id;
-      const h3Id = stPosts.find(p => String(p.horario_id) === '3')?.electivo_id;
+      // 1. Filtrar los electivos asociados a este nivel
+      const levelElectives = electives.filter(e => e.nivel_destino === nivelDestino);
 
-      const h1 = h1Id ? getElectiveName(h1Id) : 'Pendiente';
-      const h2 = h2Id ? getElectiveName(h2Id) : 'Pendiente';
-      const h3 = h3Id ? getElectiveName(h3Id) : 'Pendiente';
+      // --- PESTAÑA 1: Resumen General ---
+      const summaryData = [
+        ["REPORTES Y ROSTER DE POSTULACIÓN ELECTIVOS 2026", ""],
+        ["Liceo Arturo Alessandri Palma - Providencia", ""],
+        ["Nivel Destino:", nivelDestino === '3M' ? "3° Medio (3M)" : "4° Medio (4M)"],
+        ["Fecha de Generación:", new Date().toLocaleString('es-CL')],
+        ["", ""],
+        ["Asignatura / Modalidad", "Estudiantes Inscritos / Seleccionados"]
+      ];
 
-      const stWls = waitlist
-        .filter(w => w.alumno_id === st.id)
-        .map(w => getElectiveName(w.electivo_id))
-        .join('; ') || 'Ninguno';
+      // Sumar conteo por cada asignatura electiva
+      levelElectives.forEach(el => {
+        const enrolledCount = postulaciones.filter(p => p.electivo_id === el.id).length;
+        summaryData.push([el.nombre, enrolledCount]);
+      });
 
-      const targetNivel = getStudentNivelDestino(st.curso_actual) || '—';
+      // Sumar conteo de alumnos de modalidad Técnico Profesional (Gastronomía)
+      const tpRecords = eleccionesModalidad.filter(em => {
+        const st = students.find(s => s.id === em.alumno_id);
+        return em.modalidad === 'tecnico_profesional_gastronomia' && st && getStudentNivelDestino(st.curso_actual) === nivelDestino;
+      });
+      summaryData.push(["Técnico Profesional (Gastronomía)", tpRecords.length]);
 
-      return {
-        id: st.id,
-        nombre: formatNombre(st.nombre_completo) || 'Sin Nombre',
-        correo: st.correo || '',
-        curso: st.curso_actual || '—',
-        nivel_destino: targetNivel,
-        h1,
-        h2,
-        h3,
-        waitlist: stWls
-      };
-    });
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+      
+      // Autoajustar ancho de columnas para Resumen
+      wsSummary['!cols'] = [
+        { wch: 48 },
+        { wch: 35 }
+      ];
 
-    let csvContent = "\uFEFF"; // UTF-8 BOM
-    csvContent += "ID Alumno,Nombre Estudiante,Correo Institucional,Curso Actual,Nivel Destino,Selección Horario 1,Selección Horario 2,Selección Horario 3,En Lista de Espera\n";
+      XLSX.utils.book_append_sheet(wb, wsSummary, "Resumen General");
 
-    rosterRows.forEach(row => {
-      csvContent += `"${row.id}","${row.nombre}","${row.correo}","${row.curso}","${row.nivel_destino}","${row.h1}","${row.h2}","${row.h3}","${row.waitlist}"\n`;
-    });
+      // --- PESTAÑAS INDIVIDUALES POR CADA ELECTIVO ---
+      levelElectives.forEach(el => {
+        const elPosts = postulaciones.filter(p => p.electivo_id === el.id);
+        const sheetRows = [];
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Reporte_Electivos_Alessandri_Palma_2026.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+        // Encabezado de la hoja
+        sheetRows.push([
+          "Nº", "RUT", "Nombre completo", "Curso actual", "Correo", "Horario", "Área", "Electivo", "Nivel destino"
+        ]);
 
-  // Exportar modalidades a CSV
-  const handleExportModalidadesCSV = () => {
-    let csvContent = "\uFEFF"; // UTF-8 BOM
-    csvContent += "Nombre Estudiante,RUT,Correo,Curso Actual,Modalidad Seleccionada,Fecha Registro\n";
+        elPosts.forEach((post, index) => {
+          const st = students.find(s => s.id === post.alumno_id);
+          if (st) {
+            const schedule = horarios.find(h => h.id === post.horario_id || String(h.id) === String(post.horario_id))?.nombre || `Horario ${post.horario_id}`;
+            const areaCode = getAreaCode(el.area_id);
+            sheetRows.push([
+              index + 1,
+              st.rut || "—",
+              formatNombre(st.nombre_completo),
+              st.curso_actual || "—",
+              st.correo || "—",
+              schedule,
+              `Área ${areaCode}`,
+              el.nombre,
+              nivelDestino
+            ]);
+          }
+        });
 
-    eleccionesModalidad.forEach(row => {
-      const st = students.find(s => s.id === row.alumno_id) || {};
-      const modLabel = row.modalidad === 'cientifico_humanista' ? 'Científico Humanista' : 'Técnico Profesional (Gastronomía)';
-      const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-      csvContent += `"${formatNombre(st.nombre_completo) || 'Desconocido'}","${st.rut || '—'}","${st.correo || '—'}","${st.curso_actual || '—'}","${modLabel}","${dateStr}"\n`;
-    });
+        const ws = XLSX.utils.aoa_to_sheet(sheetRows);
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `Reporte_Modalidades_Alessandri_Palma_2026.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+        // Congelar primera fila (Header)
+        ws['!views'] = [{ state: 'frozen', ySplit: 1 }];
+
+        // Autoajustar ancho de las columnas según contenido
+        const maxCols = sheetRows[0] ? sheetRows[0].length : 0;
+        const colWidths = [];
+        for (let c = 0; c < maxCols; c++) {
+          let maxLen = 10;
+          sheetRows.forEach(row => {
+            const val = row[c] ? String(row[c]) : "";
+            if (val.length > maxLen) maxLen = val.length;
+          });
+          colWidths.push({ wch: maxLen + 3 });
+        }
+        ws['!cols'] = colWidths;
+
+        // Limitar nombre de pestaña a 30 caracteres para evitar errores en Excel
+        let sheetName = el.nombre.substring(0, 25);
+        let finalSheetName = sheetName;
+        let counter = 1;
+        while (wb.SheetNames.includes(finalSheetName)) {
+          finalSheetName = `${sheetName.substring(0, 22)} (${counter++})`;
+        }
+
+        XLSX.utils.book_append_sheet(wb, ws, finalSheetName);
+      });
+
+      // --- PESTAÑA: TP GASTRONOMÍA ---
+      const tpRows = [
+        ["Nº", "RUT", "Nombre completo", "Curso actual", "Correo", "Modalidad", "Nivel destino", "Fecha selección"]
+      ];
+
+      tpRecords.forEach((rec, index) => {
+        const st = students.find(s => s.id === rec.alumno_id);
+        if (st) {
+          const dateStr = rec.created_at ? new Date(rec.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+          tpRows.push([
+            index + 1,
+            st.rut || "—",
+            formatNombre(st.nombre_completo),
+            st.curso_actual || "—",
+            st.correo || "—",
+            "Técnico Profesional (Gastronomía)",
+            nivelDestino,
+            dateStr
+          ]);
+        }
+      });
+
+      const wsTP = XLSX.utils.aoa_to_sheet(tpRows);
+
+      // Congelar primera fila
+      wsTP['!views'] = [{ state: 'frozen', ySplit: 1 }];
+
+      // Autoajustar ancho de columnas para TP
+      const tpMaxCols = tpRows[0] ? tpRows[0].length : 0;
+      const tpColWidths = [];
+      for (let c = 0; c < tpMaxCols; c++) {
+        let maxLen = 10;
+        tpRows.forEach(row => {
+          const val = row[c] ? String(row[c]) : "";
+          if (val.length > maxLen) maxLen = val.length;
+        });
+        tpColWidths.push({ wch: maxLen + 3 });
+      }
+      wsTP['!cols'] = tpColWidths;
+
+      XLSX.utils.book_append_sheet(wb, wsTP, "TP Gastronomía");
+
+      // --- GUARDAR ARCHIVO EXCEL ---
+      XLSX.writeFile(wb, `roster_electivos_${nivelDestino}.xlsx`);
+      showToast(`Roster ${nivelDestino} (.xlsx) exportado exitosamente.`, 'success');
+    } catch (err) {
+      console.error("Error al exportar Excel:", err);
+      showToast("Error al generar el reporte Excel: " + err.message, 'error');
+    }
   };
 
   // UI Helper for Refresh Indicator
@@ -696,10 +773,16 @@ export default function AdminDashboard() {
             </div>
             {getUpdateIndicator()}
           </div>
-          <button className="laap-btn-success" onClick={handleExportCSV}>
-            <FileSpreadsheet size={18} style={{ marginRight: '8px' }} />
-            <span>Exportar Roster Completo (CSV)</span>
-          </button>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <button className="laap-btn-success" onClick={() => handleExportExcel('3M')} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FileSpreadsheet size={18} />
+              <span>Exportar Roster 3M (.xlsx)</span>
+            </button>
+            <button className="laap-btn-success" onClick={() => handleExportExcel('4M')} style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#0d9488', borderColor: '#0d9488' }}>
+              <FileSpreadsheet size={18} />
+              <span>Exportar Roster 4M (.xlsx)</span>
+            </button>
+          </div>
         </div>
 
         {/* TARJETAS SUPERIORES: ESTADOS DE LOS PROCESOS */}
@@ -1765,10 +1848,6 @@ export default function AdminDashboard() {
                   <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                     Listado de Estudiantes por Modalidad
                   </h3>
-                  <button className="laap-btn-success" onClick={handleExportModalidadesCSV} style={{ margin: 0 }}>
-                    <FileSpreadsheet size={16} style={{ marginRight: '8px' }} />
-                    <span>Exportar Modalidades (CSV)</span>
-                  </button>
                 </div>
 
                 <div className="table-responsive">
