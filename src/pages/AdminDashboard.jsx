@@ -1327,7 +1327,7 @@ export default function AdminDashboard() {
                                 const electiveName = post ? getElectiveName(post.electivo_id) : '—';
                                 return (
                                   <td key={h.id} style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    <small title={electiveName} style={{ fontWeight: post ? 'bold' : 'normal', color: post ? '#f3f4f6' : 'var(--text-secondary)' }}>
+                                    <small title={electiveName} style={{ fontWeight: post ? '600' : 'normal', color: post ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '12px' }}>
                                       {electiveName}
                                     </small>
                                   </td>
