@@ -473,15 +473,7 @@ export default function StudentPortal() {
       <div className="laap-student-portal" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         <Navbar />
         <main className="student-portal-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '24px' }}>
-          <div className="animate-scaleIn" style={{
-            maxWidth: '800px',
-            width: '100%',
-            backgroundColor: 'var(--bg-card, #1f2937)',
-            border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
-            borderRadius: '16px',
-            padding: '32px',
-            boxShadow: 'var(--shadow-lg, 0 10px 25px rgba(0,0,0,0.3))'
-          }}>
+          <div className="modality-selection-card animate-scaleIn">
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <GraduationCap size={48} style={{ color: '#3b82f6', marginBottom: '12px' }} />
               <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0', color: 'var(--text-primary, #ffffff)' }}>
@@ -492,23 +484,9 @@ export default function StudentPortal() {
               </p>
             </div>
 
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: '24px',
-              marginBottom: '32px'
-            }}>
+            <div className="modality-grid">
               {/* VÍA 1: CIENTÍFICO HUMANISTA */}
-              <div className="modality-card" style={{
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                padding: '24px',
-                borderRadius: '12px',
-                backgroundColor: 'rgba(59, 130, 246, 0.04)',
-                border: '2px solid rgba(59, 130, 246, 0.2)',
-                transition: 'all 0.3s ease'
-              }}>
+              <div className="modality-card ch-card">
                 <div>
                   <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px 0' }}>
                     <BookOpen size={20} />
@@ -526,7 +504,7 @@ export default function StudentPortal() {
                 <button
                   type="button"
                   className="laap-btn-primary"
-                  onClick={() => handleSelectModalidad('cientifico_humanista')}
+                  onClick={() => setPendingModalidad('cientifico_humanista')}
                   style={{ width: '100%', marginTop: 'auto', backgroundColor: '#2563eb' }}
                   disabled={savingModalidad}
                 >
@@ -535,16 +513,7 @@ export default function StudentPortal() {
               </div>
 
               {/* VÍA 2: TÉCNICO PROFESIONAL */}
-              <div className="modality-card" style={{
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                padding: '24px',
-                borderRadius: '12px',
-                backgroundColor: 'rgba(16, 185, 129, 0.04)',
-                border: '2px solid rgba(16, 185, 129, 0.2)',
-                transition: 'all 0.3s ease'
-              }}>
+              <div className="modality-card tp-card">
                 <div>
                   <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#34d399', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px 0' }}>
                     <GraduationCap size={20} />
@@ -570,72 +539,128 @@ export default function StudentPortal() {
                 </button>
               </div>
             </div>
- 
-            {/* ADVERTENCIA DE CONFIRMACIÓN */}
-            {pendingModalidad && (
-              <div className="laap-modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                <div className="laap-modal-card animate-scaleIn" style={{
-                  maxWidth: '500px',
-                  width: '100%',
-                  backgroundColor: 'var(--bg-card, #1f2937)',
-                  border: '1px solid rgba(255, 255, 255, 0.12)',
-                  borderRadius: '16px',
-                  padding: '32px',
-                  boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)'
-                }}>
-                  <h3 style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 16px 0', fontSize: '18px', fontWeight: 'bold' }}>
-                    <AlertTriangle size={24} />
-                    Confirmar Especialidad TP
-                  </h3>
-                  <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#e5e7eb', margin: '0 0 16px 0' }}>
-                    ¿Estás seguro de que deseas inscribirte en la especialidad de <strong>Técnico Profesional en Gastronomía</strong>?
-                  </p>
-                  <p style={{ fontSize: '13px', padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24', margin: '0 0 24px 0', lineHeight: '1.5' }}>
-                    <strong>⚠️ Esta elección finalizará tu proceso de electivos.</strong> No podrás escoger asignaturas comunes una vez confirmada esta opción.
-                  </p>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
-                    <button 
-                      type="button" 
-                      onClick={() => setPendingModalidad(null)}
-                      disabled={savingModalidad}
-                      style={{
-                        padding: '10px 18px',
-                        border: '1px solid rgba(255,255,255,0.15)',
-                        borderRadius: '8px',
-                        backgroundColor: 'transparent',
-                        color: '#9ca3af',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        fontSize: '13px',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => handleSelectModalidad('tecnico_profesional_gastronomia')}
-                      disabled={savingModalidad}
-                      style={{
-                        padding: '10px 18px',
-                        border: '1px solid transparent',
-                        borderRadius: '8px',
-                        backgroundColor: '#ef4444',
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontWeight: 'bold',
-                        fontSize: '13px',
-                        transition: 'all 0.2s',
-                        boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.4)'
-                      }}
-                    >
-                      {savingModalidad ? 'Guardando...' : 'Confirmar Selección TP'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
+
+          {/* ADVERTENCIA DE CONFIRMACIÓN */}
+          {pendingModalidad && (
+            <div className="laap-modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+              <div className="laap-modal-card animate-scaleIn" style={{
+                maxWidth: '500px',
+                width: '100%',
+                backgroundColor: 'var(--bg-card, #1f2937)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: '16px',
+                padding: '32px',
+                boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)'
+              }}>
+                {pendingModalidad === 'tecnico_profesional_gastronomia' ? (
+                  <>
+                    <h3 style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 16px 0', fontSize: '18px', fontWeight: 'bold' }}>
+                      <AlertTriangle size={24} />
+                      Confirmar Especialidad TP
+                    </h3>
+                    <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#e5e7eb', margin: '0 0 16px 0' }}>
+                      ¿Estás seguro de que deseas inscribirte en la especialidad de <strong>Técnico Profesional en Gastronomía</strong>?
+                    </p>
+                    <p style={{ fontSize: '13px', padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24', margin: '0 0 24px 0', lineHeight: '1.5' }}>
+                      <strong>⚠️ Esta elección finalizará tu proceso de electivos.</strong> No podrás escoger asignaturas comunes una vez confirmada esta opción.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => setPendingModalidad(null)}
+                        disabled={savingModalidad}
+                        style={{
+                          padding: '10px 18px',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          borderRadius: '8px',
+                          backgroundColor: 'transparent',
+                          color: '#9ca3af',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          fontSize: '13px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => handleSelectModalidad('tecnico_profesional_gastronomia')}
+                        disabled={savingModalidad}
+                        style={{
+                          padding: '10px 18px',
+                          border: '1px solid transparent',
+                          borderRadius: '8px',
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          fontSize: '13px',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.4)'
+                        }}
+                      >
+                        {savingModalidad ? 'Guardando...' : 'Confirmar Selección TP'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 style={{ color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 16px 0', fontSize: '18px', fontWeight: 'bold' }}>
+                      <BookOpen size={24} />
+                      Confirmar Modalidad Científico Humanista
+                    </h3>
+                    <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#e5e7eb', margin: '0 0 16px 0' }}>
+                      ¿Estás seguro de que deseas inscribirte en la modalidad de <strong>Científico Humanista</strong>?
+                    </p>
+                    <p style={{ fontSize: '13px', padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#60a5fa', margin: '0 0 24px 0', lineHeight: '1.5' }}>
+                      <strong>📝 Esta elección te dará acceso al catálogo de electivos.</strong> Podrás seleccionar tus 3 asignaturas electivas según las áreas disponibles.
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
+                      <button 
+                        type="button" 
+                        onClick={() => setPendingModalidad(null)}
+                        disabled={savingModalidad}
+                        style={{
+                          padding: '10px 18px',
+                          border: '1px solid rgba(255,255,255,0.15)',
+                          borderRadius: '8px',
+                          backgroundColor: 'transparent',
+                          color: '#9ca3af',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          fontSize: '13px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => handleSelectModalidad('cientifico_humanista')}
+                        disabled={savingModalidad}
+                        style={{
+                          padding: '10px 18px',
+                          border: '1px solid transparent',
+                          borderRadius: '8px',
+                          backgroundColor: '#2563eb',
+                          color: 'white',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          fontSize: '13px',
+                          transition: 'all 0.2s',
+                          boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.4)'
+                        }}
+                      >
+                        {savingModalidad ? 'Guardando...' : 'Confirmar Selección CH'}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </main>
       </div>
     );
