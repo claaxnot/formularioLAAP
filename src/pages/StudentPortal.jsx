@@ -486,6 +486,10 @@ export default function StudentPortal() {
 
           setAlreadySubmitted(true);
           showToast(data.message || '¡Tu postulación ha sido finalizada y confirmada de forma definitiva con éxito!', 'success');
+          
+          // Disparar envío de correo en segundo plano para comprobante del alumno y apoderados
+          triggerConfirmationEmail('cientifico_humanista');
+
           await fetchData(true); // Recargar datos frescos
         } catch (err) {
           console.error("Error al finalizar postulación:", err);
@@ -527,6 +531,73 @@ export default function StudentPortal() {
     );
   };
 
+  const triggerConfirmationEmail = async (selectedMod) => {
+    try {
+      const isDemo = !!localStorage.getItem('laap_mock_session');
+      if (isDemo) {
+        console.log("[Demo Mode] Omitiendo llamada a Edge Function de correo.");
+        showToast("¡Comprobante de respaldo enviado exitosamente! (Simulado)", "success");
+        return;
+      }
+
+      // 1. Obtener datos actualizados del alumno
+      const { data: stData, error: stErr } = await supabase
+        .from('alumnos')
+        .select('*')
+        .eq('id', profile.id)
+        .single();
+        
+      if (stErr) throw stErr;
+
+      // 2. Construir lista de electivos si es Científico Humanista
+      let electivesPayload = [];
+      if (selectedMod === 'cientifico_humanista') {
+        const electivesSource = Object.values(selectedElectives).filter(Boolean);
+        electivesPayload = electivesSource.map(el => ({
+          nombre: el.nombre,
+          horario_nombre: el.horario_nombre,
+          area_codigo: el.area_id
+        }));
+      }
+
+      // 3. Invocar la Edge Function
+      const { data: fnData, error: fnErr } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          email: stData.correo || profile.correo,
+          nombre_completo: stData.nombre_completo || profile.nombre_completo,
+          rut: stData.rut || profile.rut,
+          curso_actual: stData.curso_actual || profile.curso_actual,
+          nivel_destino: getStudentNivelDestino(stData.curso_actual || profile.curso_actual),
+          modalidad: selectedMod,
+          correo_apoderado_1: stData.correo_apoderado_1,
+          correo_apoderado_2: stData.correo_apoderado_2,
+          electivos: electivesPayload
+        }
+      });
+
+      if (fnErr || (fnData && !fnData.success)) {
+        throw new Error(fnErr?.message || fnData?.error || 'Fallo desconocido en Edge Function');
+      }
+
+      // 4. Registrar estado en la base de datos como exitoso ('enviado')
+      await supabase
+        .from('alumnos')
+        .update({ estado_correo: 'enviado' })
+        .eq('id', profile.id);
+        
+      showToast("¡Respaldo enviado a tu correo institucional y apoderados!", "success");
+    } catch (err) {
+      console.error("Error al enviar correo de confirmación:", err);
+      // Registrar estado fallido en base de datos ('error')
+      await supabase
+        .from('alumnos')
+        .update({ estado_correo: 'error' })
+        .eq('id', profile.id);
+
+      showToast("⚠️ Tu elección fue registrada correctamente, pero no se pudo enviar el correo de respaldo. Contacta a UTP si necesitas comprobante.", "error");
+    }
+  };
+
   const handleSelectModalidad = async (selectedMod) => {
     setSavingModalidad(true);
     try {
@@ -544,6 +615,16 @@ export default function StudentPortal() {
         if (error) {
           throw new Error(error.message);
         }
+
+        // Si es TP Gastronomía, sellar su postulación de inmediato en el roster
+        if (selectedMod === 'tecnico_profesional_gastronomia') {
+          const { error: updErr } = await supabase
+            .from('alumnos')
+            .update({ ya_postulo: true, estado_correo: 'pendiente' })
+            .eq('id', profile.id);
+            
+          if (updErr) console.warn("No se pudo sellar la postulación del alumno:", updErr);
+        }
       } else {
         console.log("[Demo Mode] Omitiendo guardado en base de datos real.");
       }
@@ -553,6 +634,11 @@ export default function StudentPortal() {
       
       setModalidad(selectedMod);
       showToast("Modalidad registrada y guardada exitosamente.", "success");
+
+      // Disparar envío de correo en segundo plano si es Técnico Profesional
+      if (selectedMod === 'tecnico_profesional_gastronomia') {
+        triggerConfirmationEmail('tecnico_profesional_gastronomia');
+      }
     } catch (err) {
       console.error("Error al registrar modalidad:", err);
       showToast("No se pudo registrar en el servidor: " + err.message, "error");

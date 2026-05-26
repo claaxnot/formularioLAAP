@@ -62,6 +62,11 @@ export default function AdminDashboard() {
   const [editingPostulacion, setEditingPostulacion] = useState(null);
   const [newElectiveId, setNewElectiveId] = useState('');
   const [savingPostulacion, setSavingPostulacion] = useState(false);
+  
+  // Student Roster Edit Modal States
+  const [showStudentModal, setShowStudentModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
+
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('create'); // 'create' or 'edit'
@@ -651,6 +656,37 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error("Error al exportar Excel:", err);
       showToast("Error al generar el reporte Excel: " + err.message, 'error');
+    }
+  };
+
+  const handleOpenEditStudentModal = (student) => {
+    setEditingStudent({ ...student });
+    setShowStudentModal(true);
+  };
+
+  const handleSaveStudentDetails = async (e) => {
+    e.preventDefault();
+    try {
+      const { error } = await supabase
+        .from('alumnos')
+        .update({
+          nombre_completo: editingStudent.nombre_completo,
+          rut: editingStudent.rut,
+          correo: editingStudent.correo,
+          curso_actual: editingStudent.curso_actual,
+          correo_apoderado_1: editingStudent.correo_apoderado_1,
+          correo_apoderado_2: editingStudent.correo_apoderado_2
+        })
+        .eq('id', editingStudent.id);
+
+      if (error) throw error;
+
+      showToast("Datos del estudiante actualizados con éxito.", "success");
+      setShowStudentModal(false);
+      fetchAdminData(false); // Refrescar de forma silenciosa de fondo
+    } catch (err) {
+      console.error("Error al actualizar alumno:", err);
+      showToast("No se pudieron guardar los cambios: " + err.message, "error");
     }
   };
 
@@ -1705,6 +1741,11 @@ export default function AdminDashboard() {
                               <td>
                                 <strong>{formatNombre(st.nombre_completo)}</strong>
                                 <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>RUT: {st.rut || 'No registrado'}</span>
+                                {(st.correo_apoderado_1 || st.correo_apoderado_2) && (
+                                  <div style={{ fontSize: '10px', color: '#60a5fa', marginTop: '4px', lineHeight: '1.2' }} title="Correos de Apoderados registrados">
+                                    👨‍👩‍👦 {st.correo_apoderado_1 || '—'} {st.correo_apoderado_2 ? ` / ${st.correo_apoderado_2}` : ''}
+                                  </div>
+                                )}
                               </td>
                               <td>{st.correo}</td>
                               <td>{st.curso_actual || '3° Medio'}</td>
@@ -1724,23 +1765,43 @@ export default function AdminDashboard() {
                                 )}
                               </td>
                               <td>
-                                {isTP ? (
-                                  <span className="status-pill available" style={{ display: 'inline-flex', padding: '4px 8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
-                                    Finalizado (TP)
-                                  </span>
-                                ) : hasSubmitted ? (
-                                  <span className="status-pill available" style={{ display: 'inline-flex', padding: '4px 8px' }}>
-                                    Listo (CH)
-                                  </span>
-                                ) : isCH ? (
-                                  <span className="status-pill full" style={{ display: 'inline-flex', padding: '4px 8px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>
-                                    En Selección CH
-                                  </span>
-                                ) : (
-                                  <span className="status-pill full" style={{ display: 'inline-flex', padding: '4px 8px' }}>
-                                    Pendiente
-                                  </span>
-                                )}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  {isTP ? (
+                                    <span className="status-pill available" style={{ display: 'inline-flex', padding: '4px 8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
+                                      Finalizado (TP)
+                                    </span>
+                                  ) : hasSubmitted ? (
+                                    <span className="status-pill available" style={{ display: 'inline-flex', padding: '4px 8px' }}>
+                                      Listo (CH)
+                                    </span>
+                                  ) : isCH ? (
+                                    <span className="status-pill full" style={{ display: 'inline-flex', padding: '4px 8px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>
+                                      En Selección CH
+                                    </span>
+                                  ) : (
+                                    <span className="status-pill full" style={{ display: 'inline-flex', padding: '4px 8px' }}>
+                                      Pendiente
+                                    </span>
+                                  )}
+                                  
+                                  {hasSubmitted && (
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                      {st.estado_correo === 'enviado' ? (
+                                        <span className="status-pill available" style={{ fontSize: '10px', padding: '2px 6px', fontWeight: 'bold', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                          📧 Enviado
+                                        </span>
+                                      ) : st.estado_correo === 'error' ? (
+                                        <span className="status-pill full" style={{ fontSize: '10px', padding: '2px 6px', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                          📧 Error
+                                        </span>
+                                      ) : (
+                                        <span className="status-pill full" style={{ fontSize: '10px', padding: '2px 6px', fontWeight: 'bold', backgroundColor: 'rgba(156, 163, 175, 0.1)', color: '#9ca3af', border: '1px solid rgba(156, 163, 175, 0.2)' }}>
+                                          📧 Pendiente
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </td>
                               {sortedHorarios.map(h => {
                                 const post = stPosts.find(p => String(p.horario_id) === String(h.id));
@@ -1765,19 +1826,31 @@ export default function AdminDashboard() {
                                 </>
                               )}
                               <td>
-                                {hasAnyRegistration ? (
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  {hasAnyRegistration ? (
+                                    <button
+                                      className="btn-table-danger"
+                                      onClick={() => handleResetStudentSelections(st)}
+                                      title="Reiniciar y liberar proceso del alumno"
+                                      style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0, height: '28px' }}
+                                    >
+                                      <Trash2 size={12} />
+                                      <span>Reiniciar</span>
+                                    </button>
+                                  ) : (
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px', marginRight: '6px' }}>—</span>
+                                  )}
+                                  
                                   <button
-                                    className="btn-table-danger"
-                                    onClick={() => handleResetStudentSelections(st)}
-                                    title="Reiniciar y liberar proceso del alumno"
-                                    style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}
+                                    className="btn-table-edit"
+                                    onClick={() => handleOpenEditStudentModal(st)}
+                                    title="Editar apoderados y ficha"
+                                    style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0, height: '28px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}
                                   >
-                                    <Trash2 size={12} />
-                                    <span>Reiniciar</span>
+                                    <Edit3 size={12} />
+                                    <span>Editar</span>
                                   </button>
-                                ) : (
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>—</span>
-                                )}
+                                </div>
                               </td>
                             </tr>
                           );
@@ -2130,6 +2203,98 @@ export default function AdminDashboard() {
             </div>
           );
         })()}
+
+        {/* MODAL EDITAR ESTUDIANTE / APODERADOS */}
+        {showStudentModal && editingStudent && (
+          <div className="laap-modal-backdrop">
+            <div className="laap-modal-card animate-scaleIn" style={{ maxWidth: '500px' }}>
+              <div className="modal-header">
+                <h2>Editar Ficha del Estudiante</h2>
+                <button className="btn-modal-close" onClick={() => setShowStudentModal(false)}>×</button>
+              </div>
+
+              <form onSubmit={handleSaveStudentDetails} className="modal-form">
+                <div className="form-group">
+                  <label>Nombre Completo</label>
+                  <input
+                    type="text"
+                    required
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white' }}
+                    value={editingStudent.nombre_completo ?? ""}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, nombre_completo: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div className="form-group">
+                    <label>RUT</label>
+                    <input
+                      type="text"
+                      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white' }}
+                      value={editingStudent.rut ?? ""}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, rut: e.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Curso Actual</label>
+                    <input
+                      type="text"
+                      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white' }}
+                      value={editingStudent.curso_actual ?? ""}
+                      onChange={(e) => setEditingStudent({ ...editingStudent, curso_actual: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Correo Electrónico Alumno</label>
+                  <input
+                    type="email"
+                    required
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white' }}
+                    value={editingStudent.correo ?? ""}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, correo: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px', marginTop: '16px' }}>
+                  <label style={{ color: '#60a5fa', fontWeight: 'bold', fontSize: '13px' }}>📧 Contactos de Apoderados (Para comprobante)</label>
+                </div>
+
+                <div className="form-group">
+                  <label>Correo Apoderado Principal</label>
+                  <input
+                    type="email"
+                    placeholder="ejemplo@correo.com"
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white' }}
+                    value={editingStudent.correo_apoderado_1 ?? ""}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, correo_apoderado_1: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Correo Apoderado Secundario (Opcional)</label>
+                  <input
+                    type="email"
+                    placeholder="ejemplo2@correo.com"
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white' }}
+                    value={editingStudent.correo_apoderado_2 ?? ""}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, correo_apoderado_2: e.target.value })}
+                  />
+                </div>
+
+                <div className="modal-actions" style={{ marginTop: '24px' }}>
+                  <button type="button" className="laap-btn-text" onClick={() => setShowStudentModal(false)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="laap-btn-primary">
+                    Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
       </main>
     </div>

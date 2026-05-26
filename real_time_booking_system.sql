@@ -62,6 +62,11 @@ USING (
 -- Asegurar que alumnos tenga la columna ya_postulo para control de finalización definitiva
 ALTER TABLE public.alumnos ADD COLUMN IF NOT EXISTS ya_postulo BOOLEAN DEFAULT FALSE;
 
+-- Columnas opcionales para apoderados y estado de envío de comprobante por correo
+ALTER TABLE public.alumnos ADD COLUMN IF NOT EXISTS correo_apoderado_1 TEXT;
+ALTER TABLE public.alumnos ADD COLUMN IF NOT EXISTS correo_apoderado_2 TEXT;
+ALTER TABLE public.alumnos ADD COLUMN IF NOT EXISTS estado_correo TEXT DEFAULT 'pendiente';
+
 -- ==========================================================================
 -- 3. FUNCIÓN RPC: reservar_electivo_temporal (TRANSACTIONAL SEAT BOOKING)
 -- ==========================================================================
