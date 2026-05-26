@@ -54,6 +54,36 @@ export default function StudentPortal() {
   const [savingModalidad, setSavingModalidad] = useState(false);
   const [pendingModalidad, setPendingModalidad] = useState(null);
 
+  // Estados del sistema de reservas temporales
+  const [temporaryReservations, setTemporaryReservations] = useState([]);
+  const [reservationExpiry, setReservationExpiry] = useState(null);
+  const [timeLeft, setTimeLeft] = useState('');
+  const [reservingScheduleId, setReservingScheduleId] = useState(null);
+
+  // Manejo del temporizador de cuenta regresiva para la expiración
+  useEffect(() => {
+    if (!reservationExpiry) {
+      setTimeLeft('');
+      return;
+    }
+
+    const interval = setInterval(() => {
+      const diff = reservationExpiry - Date.now();
+      if (diff <= 0) {
+        setTimeLeft('Reserva expirada');
+        setReservationExpiry(null);
+        showToast("⚠️ Tus reservas temporales han expirado y las vacantes fueron liberadas.", "error");
+        fetchData(false);
+      } else {
+        const mins = Math.floor(diff / 60000);
+        const secs = Math.floor((diff % 60000) / 1000);
+        setTimeLeft(`Reserva temporal: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [reservationExpiry]);
+
   // Cargar datos al montar o al cambiar de perfil
   useEffect(() => {
     if (profile?.id) {
@@ -172,7 +202,7 @@ export default function StudentPortal() {
       }
       setModalidad(currentModalidad);
 
-      // 1. Verificar si hay postulaciones reales del alumno en Supabase
+      // 1. Verificar si el alumno ya tiene postulaciones definitivas en Supabase
       const { data: postData, error: postErr } = await supabase
         .from('postulaciones')
         .select('*, electivos(*)')
@@ -185,6 +215,19 @@ export default function StudentPortal() {
         hasPostulaciones = true;
         userSelections = postData;
       }
+
+      // 1.5. Consultar reservas temporales vigentes del alumno en Supabase
+      const { data: tempReservas, error: tempErr } = await supabase
+        .from('reservas_temporales')
+        .select('*')
+        .eq('alumno_id', profile.id)
+        .gt('expires_at', new Date().toISOString());
+
+      let currentTempReservations = [];
+      if (!tempErr && tempReservas) {
+        currentTempReservations = tempReservas;
+      }
+      setTemporaryReservations(currentTempReservations);
 
       // 2. Consultar lista de espera del alumno en Supabase
       const { data: wlData, error: wlErr } = await supabase
@@ -237,7 +280,8 @@ export default function StudentPortal() {
               orden: order,
               nombre: name,
               color: color,
-              label: name
+              label: name,
+              uuid: item.horario_id // UUID real de la tabla horarios
             };
           }
 
@@ -251,6 +295,9 @@ export default function StudentPortal() {
             cupos_ocupados: item.cupos_ocupados || 0,
             cupos_disponibles: item.cupos_disponibles !== undefined ? item.cupos_disponibles : 15,
             horario_id: order,
+            horario_uuid: item.horario_id, // Preservar el UUID real!
+            horario_orden: order, // Preservar el orden real!
+            horario_nombre: name, // Preservar el nombre real del horario!
             area_id: item.area_codigo || item.area_id || 'A',
             area_nombre: item.area_nombre || 'Área A',
             estado: item.estado || 'disponible'
@@ -261,6 +308,34 @@ export default function StudentPortal() {
       const sortedHorarios = Object.values(horariosMap).sort((a, b) => a.orden - b.orden);
       setHorarios(sortedHorarios);
       setElectives(allElectives);
+
+      // Sincronizar selectedElectives con reservas temporales o postulaciones finales
+      const selectionsMap = {};
+      if (hasPostulaciones) {
+        userSelections.forEach(sel => {
+          const matchedEl = allElectives.find(e => e.id === sel.electivo_id);
+          if (matchedEl) {
+            selectionsMap[matchedEl.horario_nombre] = matchedEl;
+          }
+        });
+      } else {
+        currentTempReservations.forEach(r => {
+          const matchedEl = allElectives.find(e => e.id === r.electivo_id);
+          if (matchedEl) {
+            selectionsMap[matchedEl.horario_nombre] = matchedEl;
+          }
+        });
+      }
+      setSelectedElectives(selectionsMap);
+
+      // Sincronizar temporizador de expiración de la reserva
+      if (!hasPostulaciones && currentTempReservations.length > 0) {
+        const expDates = currentTempReservations.map(r => new Date(r.expires_at).getTime());
+        const minExpiry = Math.min(...expDates);
+        setReservationExpiry(minExpiry);
+      } else {
+        setReservationExpiry(null);
+      }
 
       // Registrar hora exacta de última actualización
       const now = new Date();
@@ -274,15 +349,52 @@ export default function StudentPortal() {
     }
   };
 
-  // Manejar selección de tarjeta
-  const handleSelect = (horarioNombre, elective) => {
-    if (alreadySubmitted || !isProcessOpen) return;
+  // Manejar selección de tarjeta con reserva transaccional en tiempo real
+  const handleSelect = async (horarioNombre, elective) => {
+    if (alreadySubmitted || !isProcessOpen || reservingScheduleId) return;
 
+    const previousSelection = selectedElectives[horarioNombre];
+
+    // 1. Actualización optimista de la UI
     setSelectedElectives(prev => {
       const next = { ...prev, [horarioNombre]: elective };
       validateSelections(next);
       return next;
     });
+
+    // Bloquear clics del bloque horario mientras se procesa la transacción
+    setReservingScheduleId(elective.horario_uuid);
+
+    try {
+      // 2. Comunicarse con la base de datos atómicamente
+      const { data, error } = await supabase.rpc('reservar_electivo_temporal', {
+        p_alumno_id: profile.id,
+        p_electivo_id: elective.id,
+        p_horario_id: elective.horario_uuid
+      });
+
+      if (error) throw error;
+
+      if (data && data.success === false) {
+        throw new Error(data.message);
+      }
+
+      // 3. Éxito: notificar y recargar la data (vacantes actualizadas y expiración)
+      showToast(data.message || `Cupo reservado temporalmente para "${elective.nombre}".`, 'success');
+      await fetchData(false);
+    } catch (err) {
+      console.error("Error en reserva transaccional:", err);
+      showToast("⚠️ No se pudo reservar: " + err.message, 'error');
+
+      // 4. Reversión automática del estado visual (Rollback)
+      setSelectedElectives(prev => {
+        const next = { ...prev, [horarioNombre]: previousSelection };
+        validateSelections(next);
+        return next;
+      });
+    } finally {
+      setReservingScheduleId(null);
+    }
   };
 
   // Validar reglas (Max 2 por área)
@@ -335,7 +447,7 @@ export default function StudentPortal() {
     );
   };
 
-  // Guardar la selección final vía Supabase RPC
+  // Guardar la selección final vía Supabase RPC transaccional
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
@@ -357,28 +469,27 @@ export default function StudentPortal() {
     if (!validateSelections(selectedElectives)) return;
 
     showConfirm(
-      '¿Estás seguro de enviar tu selección de electivos? Una vez guardada no podrás modificarla.',
+      '¿Estás seguro de finalizar tu postulación de electivos? Una vez confirmada, tu selección quedará sellada definitivamente y tu portal se bloqueará.',
       async () => {
         setSubmitting(true);
         try {
-          // Mapear los horarios ordenados a los 3 electivos requeridos por la RPC
-          const sortedSelections = horarios.map(h => selectedElectives[h.nombre]?.id);
-
-          const { data, error } = await supabase.rpc('guardar_seleccion_electivos', {
-            p_alumno_id: profile.id,
-            p_electivo_1: sortedSelections[0] || null,
-            p_electivo_2: sortedSelections[1] || null,
-            p_electivo_3: sortedSelections[2] || null
+          const { data, error } = await supabase.rpc('confirmar_postulacion_final', {
+            p_alumno_id: profile.id
           });
 
           if (error) throw error;
 
+          if (data && data.success === false) {
+            throw new Error(data.message);
+          }
+
           setAlreadySubmitted(true);
-          setSuccessMsg('Tu selección ha sido guardada exitosamente.');
+          showToast(data.message || '¡Tu postulación ha sido finalizada y confirmada de forma definitiva con éxito!', 'success');
           await fetchData(true); // Recargar datos frescos
         } catch (err) {
-          console.error("Error al registrar selección:", err);
-          setErrorMsg('Error al guardar tu selección: ' + (err.message || 'Intente nuevamente.'));
+          console.error("Error al finalizar postulación:", err);
+          showToast('No se pudo finalizar: ' + err.message, 'error');
+          setErrorMsg('Error al finalizar postulación: ' + err.message);
         } finally {
           setSubmitting(false);
         }
@@ -959,6 +1070,27 @@ export default function StudentPortal() {
                 <Bookmark size={18} />
                 <span>Resumen de Elección</span>
               </div>
+
+              {timeLeft && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  backgroundColor: timeLeft.includes('expirada') ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                  border: timeLeft.includes('expirada') ? '1px solid #ef4444' : '1px solid #f59e0b',
+                  color: timeLeft.includes('expirada') ? '#ef4444' : '#f59e0b',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12.5px',
+                  fontWeight: 'bold',
+                  marginBottom: '16px',
+                  animation: 'laap-pulse 2s infinite'
+                }}>
+                  <Clock size={15} />
+                  <span>{timeLeft}</span>
+                </div>
+              )}
               <div className="summary-cards">
                 {horarios.map((h, idx) => {
                   const selection = selectedElectives[h.nombre];
@@ -1020,14 +1152,32 @@ export default function StudentPortal() {
                         const isFull = el.cupos_disponibles <= 0;
                         const isWaitlisted = waitlistStatus[el.id] || false;
                         const isExpanded = expandedElectives[el.id] || false;
+                        const isReservingThisBlock = reservingScheduleId === el.horario_uuid;
 
                         return (
                           <div
                             key={el.id}
-                            className={`elective-card ${isSelected ? 'selected' : ''} ${isFull || !isProcessOpen ? 'disabled' : ''} ${isExpanded ? 'details-expanded' : 'details-collapsed'}`}
-                            style={{ '--horario-bg': h.color }}
-                            onClick={() => isProcessOpen && !isFull && handleSelect(h.nombre, el)}
+                            className={`elective-card ${isSelected ? 'selected' : ''} ${isFull || !isProcessOpen || isReservingThisBlock ? 'disabled' : ''} ${isExpanded ? 'details-expanded' : 'details-collapsed'}`}
+                            style={{ '--horario-bg': h.color, position: 'relative' }}
+                            onClick={() => isProcessOpen && !isFull && !isReservingThisBlock && handleSelect(h.nombre, el)}
                           >
+                            {isReservingThisBlock && isSelected && (
+                              <div style={{
+                                position: 'absolute',
+                                top: 0, right: 0, bottom: 0, left: 0,
+                                backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                                borderRadius: '8px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '8px',
+                                zIndex: 10
+                              }}>
+                                <div className="laap-spinner" style={{ width: '24px', height: '24px', borderWidth: '3px' }}></div>
+                                <span style={{ fontSize: '11px', color: '#60a5fa', fontWeight: 'bold' }}>Reservando cupo...</span>
+                              </div>
+                            )}
                             {/* Meta Cabecera (Desktop & Mobile Adaptiva) */}
                             <div className="card-header-meta">
                               <span className={`area-badge area-${el.area_id}`}>

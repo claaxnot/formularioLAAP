@@ -43,6 +43,7 @@ export default function AdminDashboard() {
   const [cupos, setCupos] = useState([]);
   const [postulaciones, setPostulaciones] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
+  const [temporaryReservations, setTemporaryReservations] = useState([]);
   const [horarios, setHorarios] = useState([]);
   const [areas, setAreas] = useState([]);
   const [activeProcess3M, setActiveProcess3M] = useState(null);
@@ -147,6 +148,18 @@ export default function AdminDashboard() {
         const proc4M = procData?.find(p => p.nivel_destino === '4M' && p.activo === true) || procData?.find(p => p.nivel_destino === '4M') || null;
         setActiveProcess3M(proc3M);
         setActiveProcess4M(proc4M);
+      }
+
+      // 8.5. Cargar reservas temporales activas vigentes desde Supabase
+      const { data: tempResData, error: tempResErr } = await supabase
+        .from('reservas_temporales')
+        .select('*')
+        .gt('expires_at', new Date().toISOString());
+
+      if (!tempResErr && tempResData) {
+        setTemporaryReservations(tempResData);
+      } else if (tempResErr) {
+        console.error("Error al obtener reservas temporales:", tempResErr);
       }
 
       setStudents(stdData || []);
@@ -614,9 +627,18 @@ export default function AdminDashboard() {
   const pendingStudentsCount = totalStudentsCount - completedStudentsCount;
   const participationRate = totalStudentsCount > 0 ? Math.round((completedStudentsCount / totalStudentsCount) * 100) : 0;
 
+  // Contar reservas temporales activas de acuerdo al filtro
+  const activeTempReservationsCount = temporaryReservations.filter(r => {
+    if (statsFilter === 'all') return true;
+    const matchedEl = electives.find(e => e.id === r.electivo_id);
+    return matchedEl?.nivel_destino === statsFilter;
+  }).length;
+
   const totalSeatsCapacity = filteredCuposForStats.reduce((acc, c) => acc + (c.cupos_maximos || 0), 0);
   const totalSeatsOccupied = filteredCuposForStats.reduce((acc, c) => acc + (c.cupos_ocupados || 0), 0);
-  const totalSeatsAvailable = totalSeatsCapacity - totalSeatsOccupied;
+  
+  // Cupos estrictamente libres (restando postulaciones y reservas temporales)
+  const totalSeatsRemaining = Math.max(0, totalSeatsCapacity - totalSeatsOccupied - activeTempReservationsCount);
   const totalWaitlistedCount = filteredWaitlistForStats.length;
 
   if (loading) {
@@ -884,33 +906,43 @@ export default function AdminDashboard() {
             </div>
 
             {/* Tarjetas KPI */}
-            <div className="kpi-grid">
+            <div className="kpi-grid" style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              marginBottom: '24px'
+            }}>
               <div className="kpi-card">
                 <span className="kpi-label">Matrícula Estudiantes</span>
                 <span className="kpi-value">{totalStudentsCount}</span>
                 <span className="kpi-trend">Roster total en el sistema</span>
               </div>
               <div className="kpi-card">
-                <span className="kpi-label">Participación Total</span>
+                <span className="kpi-label">Participación (Final)</span>
                 <span className="kpi-value">{participationRate}%</span>
                 <div className="participation-bar-wrapper">
                   <div className="participation-bar" style={{ width: `${participationRate}%` }} />
                 </div>
                 <span className="kpi-trend">
-                  {completedStudentsCount} completados / {pendingStudentsCount} pendientes
+                  {completedStudentsCount} listos / {pendingStudentsCount} pendientes
                 </span>
               </div>
               <div className="kpi-card">
-                <span className="kpi-label">Cupos Totales Asignados</span>
-                <span className="kpi-value">{totalSeatsOccupied} / {totalSeatsCapacity}</span>
+                <span className="kpi-label">Reservas Temporales</span>
+                <span className="kpi-value" style={{ color: '#fbbf24' }}>{activeTempReservationsCount}</span>
+                <span className="kpi-trend">Cupos retenidos por 5 min</span>
+              </div>
+              <div className="kpi-card">
+                <span className="kpi-label">Cupos Libres Reales</span>
+                <span className="kpi-value" style={{ color: '#34d399' }}>{totalSeatsRemaining}</span>
                 <span className="kpi-trend">
-                  {totalSeatsAvailable} vacantes disponibles
+                  Resta postulaciones y reservas
                 </span>
               </div>
               <div className="kpi-card">
-                <span className="kpi-label">Alumnos en Lista de Espera</span>
+                <span className="kpi-label">Lista de Espera</span>
                 <span className="kpi-value">{totalWaitlistedCount}</span>
-                <span className="kpi-trend">Esperando liberación de cupos</span>
+                <span className="kpi-trend">Esperando liberación</span>
               </div>
             </div>
             {/* Ocupación por Electivos */}
@@ -951,12 +983,33 @@ export default function AdminDashboard() {
                       }
 
                       return electives3M.map(el => {
-                        const percent = el.cupos_maximos > 0 ? Math.round((el.cupos_ocupados / el.cupos_maximos) * 100) : 0;
+                        const activeTempForEl = temporaryReservations.filter(r => r.electivo_id === el.electivo_id || r.electivo_id === el.id);
+                        const tempCount = activeTempForEl.length;
+                        const livePercent = el.cupos_maximos > 0 ? Math.round(((el.cupos_ocupados + tempCount) / el.cupos_maximos) * 100) : 0;
                         const order = el.horario_orden || 1;
                         return (
                           <div key={el.electivo_id || el.id} className="stat-elective-row" style={{ borderLeft: `5px solid ${String(order) === '1' ? '#d97706' : String(order) === '2' ? '#db2777' : '#2563eb'}`, padding: '12px 16px', margin: 0 }}>
                             <div className="stat-el-info">
-                              <strong style={{ fontSize: '13.5px' }}>{el.nombre}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <strong style={{ fontSize: '13.5px' }}>{el.nombre}</strong>
+                                {tempCount > 0 && (
+                                  <span style={{
+                                    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                    border: '1px solid #f59e0b',
+                                    color: '#fbbf24',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '9.5px',
+                                    fontWeight: 'bold',
+                                    marginLeft: '8px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}>
+                                    <Clock size={10} /> {tempCount} reservado(s) temp.
+                                  </span>
+                                )}
+                              </div>
                               <span className="stat-el-sub" style={{ fontSize: '11px', marginTop: '2px' }}>
                                 {el.horario_nombre || `Horario ${order}`} | Área {el.area_codigo || 'A'} | {el.profesor || el.docente || 'Docente UTP'}
                               </span>
@@ -964,10 +1017,43 @@ export default function AdminDashboard() {
 
                             <div className="stat-el-progress-col" style={{ width: '100%', gap: '10px', marginTop: '8px' }}>
                               <div className="stat-progress-bar-container" style={{ height: '8px' }}>
-                                <div className={`stat-progress-bar ${percent >= 100 ? 'full' : ''}`} style={{ width: `${percent}%` }} />
+                                <div className={`stat-progress-bar ${livePercent >= 100 ? 'full' : ''}`} style={{ width: `${livePercent}%` }} />
                               </div>
-                              <span className="stat-percent-text" style={{ fontSize: '11.5px', minWidth: '75px' }}>{el.cupos_ocupados} / {el.cupos_maximos} ({percent}%)</span>
+                              <span className="stat-percent-text" style={{ fontSize: '11px', minWidth: '105px' }}>
+                                {el.cupos_ocupados} firmes {tempCount > 0 ? `+ ${tempCount} temp ` : ''}/ {el.cupos_maximos} ({livePercent}%)
+                              </span>
                             </div>
+
+                            {activeTempForEl.length > 0 && (
+                              <div style={{
+                                fontSize: '10px',
+                                color: '#9ca3af',
+                                marginTop: '8px',
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                                borderLeft: '2px solid #f59e0b',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px'
+                              }}>
+                                <strong style={{ color: 'var(--text-secondary)' }}>Reservas activas (expiración):</strong>
+                                {activeTempForEl.map(r => {
+                                  const studentObj = students.find(s => s.id === r.alumno_id);
+                                  const studentName = studentObj ? studentObj.nombre_completo : 'Estudiante';
+                                  const secondsLeft = Math.max(0, Math.round((new Date(r.expires_at).getTime() - Date.now()) / 1000));
+                                  const mins = Math.floor(secondsLeft / 60);
+                                  const secs = secondsLeft % 60;
+                                  const expiryFormatted = secondsLeft > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : 'expirado';
+                                  return (
+                                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span>• {studentName}</span>
+                                      <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{expiryFormatted}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       });
@@ -1003,12 +1089,33 @@ export default function AdminDashboard() {
                       }
 
                       return electives4M.map(el => {
-                        const percent = el.cupos_maximos > 0 ? Math.round((el.cupos_ocupados / el.cupos_maximos) * 100) : 0;
+                        const activeTempForEl = temporaryReservations.filter(r => r.electivo_id === el.electivo_id || r.electivo_id === el.id);
+                        const tempCount = activeTempForEl.length;
+                        const livePercent = el.cupos_maximos > 0 ? Math.round(((el.cupos_ocupados + tempCount) / el.cupos_maximos) * 100) : 0;
                         const order = el.horario_orden || 1;
                         return (
                           <div key={el.electivo_id || el.id} className="stat-elective-row" style={{ borderLeft: `5px solid ${String(order) === '1' ? '#d97706' : String(order) === '2' ? '#db2777' : '#2563eb'}`, padding: '12px 16px', margin: 0 }}>
                             <div className="stat-el-info">
-                              <strong style={{ fontSize: '13.5px' }}>{el.nombre}</strong>
+                              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <strong style={{ fontSize: '13.5px' }}>{el.nombre}</strong>
+                                {tempCount > 0 && (
+                                  <span style={{
+                                    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                                    border: '1px solid #f59e0b',
+                                    color: '#fbbf24',
+                                    padding: '1px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '9.5px',
+                                    fontWeight: 'bold',
+                                    marginLeft: '8px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}>
+                                    <Clock size={10} /> {tempCount} reservado(s) temp.
+                                  </span>
+                                )}
+                              </div>
                               <span className="stat-el-sub" style={{ fontSize: '11px', marginTop: '2px' }}>
                                 {el.horario_nombre || `Horario ${order}`} | Área {el.area_codigo || 'A'} | {el.profesor || el.docente || 'Docente UTP'}
                               </span>
@@ -1016,10 +1123,43 @@ export default function AdminDashboard() {
 
                             <div className="stat-el-progress-col" style={{ width: '100%', gap: '10px', marginTop: '8px' }}>
                               <div className="stat-progress-bar-container" style={{ height: '8px' }}>
-                                <div className={`stat-progress-bar ${percent >= 100 ? 'full' : ''}`} style={{ width: `${percent}%` }} />
+                                <div className={`stat-progress-bar ${livePercent >= 100 ? 'full' : ''}`} style={{ width: `${livePercent}%` }} />
                               </div>
-                              <span className="stat-percent-text" style={{ fontSize: '11.5px', minWidth: '75px' }}>{el.cupos_ocupados} / {el.cupos_maximos} ({percent}%)</span>
+                              <span className="stat-percent-text" style={{ fontSize: '11px', minWidth: '105px' }}>
+                                {el.cupos_ocupados} firmes {tempCount > 0 ? `+ ${tempCount} temp ` : ''}/ {el.cupos_maximos} ({livePercent}%)
+                              </span>
                             </div>
+
+                            {activeTempForEl.length > 0 && (
+                              <div style={{
+                                fontSize: '10px',
+                                color: '#9ca3af',
+                                marginTop: '8px',
+                                padding: '6px 8px',
+                                borderRadius: '4px',
+                                backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                                borderLeft: '2px solid #f59e0b',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '2px'
+                              }}>
+                                <strong style={{ color: 'var(--text-secondary)' }}>Reservas activas (expiración):</strong>
+                                {activeTempForEl.map(r => {
+                                  const studentObj = students.find(s => s.id === r.alumno_id);
+                                  const studentName = studentObj ? studentObj.nombre_completo : 'Estudiante';
+                                  const secondsLeft = Math.max(0, Math.round((new Date(r.expires_at).getTime() - Date.now()) / 1000));
+                                  const mins = Math.floor(secondsLeft / 60);
+                                  const secs = secondsLeft % 60;
+                                  const expiryFormatted = secondsLeft > 0 ? `${mins}:${String(secs).padStart(2, '0')}` : 'expirado';
+                                  return (
+                                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <span>• {studentName}</span>
+                                      <span style={{ color: '#fbbf24', fontWeight: 'bold' }}>{expiryFormatted}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       });
