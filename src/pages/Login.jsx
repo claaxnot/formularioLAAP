@@ -57,7 +57,7 @@ export default function Login() {
       const { data: studentsData, error: studentsErr } = await supabase
         .from('alumnos')
         .select('id, rut, nombre_completo, correo, curso_actual, activo');
-      
+
       if (studentsErr) throw studentsErr;
 
       // 2. Cargar administradores reales activos
@@ -232,7 +232,7 @@ export default function Login() {
   return (
     <div className="laap-login-page">
       <div className="laap-login-container">
-        
+
         {/* Encabezado Institucional */}
         <div className="laap-login-header">
           <div className="login-logo-container" style={{ background: 'white', padding: '16px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(255, 255, 255, 0.15)' }}>
@@ -292,7 +292,7 @@ export default function Login() {
               </div>
 
               {/* Botón para colapsar Sandbox */}
-              <button 
+              <button
                 className="laap-btn-text sandbox-toggle"
                 onClick={handleToggleSandbox}
               >
@@ -363,11 +363,11 @@ export default function Login() {
 
                   {/* Toggle para cambiar a modo Offline si se desea */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0 14px 0', fontSize: '11px' }}>
-                    <input 
-                      type="checkbox" 
-                      id="useManualOffline" 
-                      checked={useManualOffline} 
-                      onChange={(e) => setUseManualOffline(e.target.checked)} 
+                    <input
+                      type="checkbox"
+                      id="useManualOffline"
+                      checked={useManualOffline}
+                      onChange={(e) => setUseManualOffline(e.target.checked)}
                     />
                     <label htmlFor="useManualOffline" style={{ cursor: 'pointer', color: '#9ca3af' }}>
                       Simular con datos ficticios (Offline/Fallback)
@@ -432,14 +432,14 @@ export default function Login() {
                           <label style={{ fontSize: '12px' }}>
                             {demoRole === 'student' ? 'Seleccionar Alumno Real de la Base:' : 'Seleccionar Administrador Real de la Base:'}
                           </label>
-                          
+
                           {demoRole === 'student' ? (
                             dbStudents.length === 0 ? (
                               <div style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic', padding: '4px 0' }}>No se encontraron alumnos registrados en Supabase.</div>
                             ) : (
                               <>
-                                <select 
-                                  value={selectedStudentId} 
+                                <select
+                                  value={selectedStudentId}
                                   onChange={(e) => setSelectedStudentId(e.target.value)}
                                   style={{ fontSize: '13px', padding: '8px' }}
                                 >
@@ -451,11 +451,11 @@ export default function Login() {
                                 </select>
 
                                 {activeStudent && (
-                                  <div style={{ 
-                                    marginTop: '12px', 
-                                    padding: '10px', 
-                                    borderRadius: '6px', 
-                                    background: 'rgba(255,255,255,0.04)', 
+                                  <div style={{
+                                    marginTop: '12px',
+                                    padding: '10px',
+                                    borderRadius: '6px',
+                                    background: 'rgba(255,255,255,0.04)',
                                     border: '1px solid rgba(255,255,255,0.08)',
                                     fontSize: '11px',
                                     fontFamily: 'monospace',
@@ -471,7 +471,7 @@ export default function Login() {
                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85%' }}>
                                         <strong>UUID:</strong> {activeStudent.id}
                                       </span>
-                                      <button 
+                                      <button
                                         onClick={(e) => handleCopy(activeStudent.id, e)}
                                         style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
                                         title="Copiar ID para pruebas RPC"
@@ -488,8 +488,8 @@ export default function Login() {
                               <div style={{ fontSize: '11px', color: '#9ca3af', fontStyle: 'italic', padding: '4px 0' }}>No se encontraron administradores activos registrados en Supabase.</div>
                             ) : (
                               <>
-                                <select 
-                                  value={selectedAdminId} 
+                                <select
+                                  value={selectedAdminId}
                                   onChange={(e) => setSelectedAdminId(e.target.value)}
                                   style={{ fontSize: '13px', padding: '8px' }}
                                 >
@@ -501,11 +501,11 @@ export default function Login() {
                                 </select>
 
                                 {activeAdmin && (
-                                  <div style={{ 
-                                    marginTop: '12px', 
-                                    padding: '10px', 
-                                    borderRadius: '6px', 
-                                    background: 'rgba(255,255,255,0.04)', 
+                                  <div style={{
+                                    marginTop: '12px',
+                                    padding: '10px',
+                                    borderRadius: '6px',
+                                    background: 'rgba(255,255,255,0.04)',
                                     border: '1px solid rgba(255,255,255,0.08)',
                                     fontSize: '11px',
                                     fontFamily: 'monospace',
@@ -521,7 +521,7 @@ export default function Login() {
                                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '85%' }}>
                                         <strong>UUID:</strong> {activeAdmin.id}
                                       </span>
-                                      <button 
+                                      <button
                                         onClick={(e) => handleCopy(activeAdmin.id, e)}
                                         style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', padding: '2px', display: 'flex', alignItems: 'center' }}
                                         title="Copiar ID"
@@ -539,8 +539,8 @@ export default function Login() {
                     </>
                   )}
 
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     className="laap-btn-primary full-width sandbox-submit"
                     disabled={!useManualOffline && dbLoading}
                     style={{ marginTop: '12px' }}
@@ -582,13 +582,13 @@ export default function Login() {
                   </div>
 
                   {realLoginErr && (
-                    <div style={{ 
-                      padding: '8px 10px', 
+                    <div style={{
+                      padding: '8px 10px',
                       borderRadius: '6px',
-                      fontSize: '11px', 
-                      lineHeight: '1.4', 
-                      marginBottom: '12px', 
-                      backgroundColor: 'rgba(239, 68, 68, 0.15)', 
+                      fontSize: '11px',
+                      lineHeight: '1.4',
+                      marginBottom: '12px',
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
                       border: '1px solid #ef4444',
                       color: '#f87171'
                     }}>
@@ -658,13 +658,13 @@ export default function Login() {
                   </div>
 
                   {rpcStatus && (
-                    <div style={{ 
-                      padding: '10px', 
+                    <div style={{
+                      padding: '10px',
                       borderRadius: '6px',
-                      fontSize: '12px', 
-                      lineHeight: '1.4', 
-                      marginBottom: '16px', 
-                      backgroundColor: rpcStatus.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)', 
+                      fontSize: '12px',
+                      lineHeight: '1.4',
+                      marginBottom: '16px',
+                      backgroundColor: rpcStatus.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                       border: `1px solid ${rpcStatus.success ? '#10b981' : '#ef4444'}`,
                       color: rpcStatus.success ? '#34d399' : '#f87171'
                     }}>
@@ -685,7 +685,7 @@ export default function Login() {
         {/* Footer Institucional */}
         <div className="laap-login-footer">
           <p>© 2026 Liceo Arturo Alessandri Palma. Todos los derechos reservados.</p>
-          <p>Para soporte o consultas técnicas, escribir a <strong>soporte@alessandri.cl</strong></p>
+          <p>Para soporte o consultas técnicas, escribir a <strong>cvidal@liceoalessandri.cl</strong></p>
         </div>
 
       </div>

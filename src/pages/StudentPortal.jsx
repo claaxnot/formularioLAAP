@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import Navbar from '../components/Navbar';
-import { 
-  CheckCircle, 
-  AlertTriangle, 
-  BookOpen, 
-  Users, 
-  Clock, 
-  Bookmark, 
+import {
+  CheckCircle,
+  AlertTriangle,
+  BookOpen,
+  Users,
+  Clock,
+  Bookmark,
   Lock,
   ListOrdered,
   ChevronDown
@@ -146,14 +146,14 @@ export default function StudentPortal() {
         .from('lista_espera')
         .select('electivo_id')
         .eq('alumno_id', profile.id);
-      
+
       const wlMap = {};
       if (!wlErr && wlData) {
         wlData.forEach(item => {
           wlMap[item.electivo_id] = true;
         });
       }
-      
+
       setWaitlistStatus(wlMap);
       setAlreadySubmitted(hasPostulaciones);
       setExistingSelections(userSelections);
@@ -174,8 +174,8 @@ export default function StudentPortal() {
       const allElectives = [];
 
       // Filtro de activo estricto: electivo.activo === true y nivel_destino === targetNivelDestino
-      const filteredData = (cuposData || []).filter(item => 
-        item.activo === true && 
+      const filteredData = (cuposData || []).filter(item =>
+        item.activo === true &&
         item.nivel_destino === targetNivelDestino
       );
 
@@ -244,7 +244,7 @@ export default function StudentPortal() {
   const validateSelections = (selections) => {
     setErrorMsg('');
     const activeSelections = Object.values(selections).filter(Boolean);
-    
+
     if (activeSelections.length > 0) {
       const areaCounts = {};
       activeSelections.forEach(el => {
@@ -266,7 +266,7 @@ export default function StudentPortal() {
   // Unirse a la lista de espera real en Supabase
   const handleJoinWaitlist = async (elective) => {
     if (alreadySubmitted || !isProcessOpen) return;
-    
+
     showConfirm(
       `¿Deseas inscribirte en la Lista de Espera para "${elective.nombre}"?`,
       async () => {
@@ -442,8 +442,8 @@ export default function StudentPortal() {
             <span style={{ fontFamily: 'monospace', backgroundColor: 'rgba(0,0,0,0.2)', padding: '8px', borderRadius: '4px' }}>
               {criticalError}
             </span>
-            <button 
-              onClick={() => fetchData(true)} 
+            <button
+              onClick={() => fetchData(true)}
               style={{ alignSelf: 'flex-start', background: '#ef4444', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               Reintentar Consulta
@@ -509,7 +509,7 @@ export default function StudentPortal() {
             <Lock className="notice-icon" size={48} />
             <h2>Formulario Bloqueado</h2>
             <p className="notice-msg">
-              “Ya registraste tu selección de electivos. Si necesitas hacer un cambio, debes contactar a UTP o administración.”
+              “Ya registraste tu selección de electivos. Si necesitas hacer un cambio, debes contactar a UTP.”
             </p>
 
             <div className="selections-display">
@@ -526,12 +526,12 @@ export default function StudentPortal() {
                   const areaName = matchedElective?.area_nombre || 'Área A';
 
                   return (
-                    <div 
-                      key={sel.id || idx} 
-                      className="selected-display-card" 
-                      style={{ 
-                        borderLeft: `6px solid ${idx === 0 ? '#d97706' : idx === 1 ? '#db2777' : '#2563eb'}`, 
-                        backgroundColor: blockColor 
+                    <div
+                      key={sel.id || idx}
+                      className="selected-display-card"
+                      style={{
+                        borderLeft: `6px solid ${idx === 0 ? '#d97706' : idx === 1 ? '#db2777' : '#2563eb'}`,
+                        backgroundColor: blockColor
                       }}
                     >
                       <div className="card-idx">{orderName}</div>
@@ -591,8 +591,8 @@ export default function StudentPortal() {
                 </div>
               )}
 
-              <button 
-                type="submit" 
+              <button
+                type="submit"
                 className="laap-btn-primary submit-selections-btn"
                 disabled={submitting || !isProcessOpen || horarios.some(h => !selectedElectives[h.nombre])}
               >
@@ -620,7 +620,7 @@ export default function StudentPortal() {
                         const isExpanded = expandedElectives[el.id] || false;
 
                         return (
-                          <div 
+                          <div
                             key={el.id}
                             className={`elective-card ${isSelected ? 'selected' : ''} ${isFull || !isProcessOpen ? 'disabled' : ''} ${isExpanded ? 'details-expanded' : 'details-collapsed'}`}
                             style={{ '--horario-bg': h.color }}
@@ -643,8 +643,8 @@ export default function StudentPortal() {
                             <h3 className="elective-title">{el.nombre}</h3>
 
                             {/* Botón de Expansión (Solo Visible en Mobile mediante CSS) */}
-                            <button 
-                              type="button" 
+                            <button
+                              type="button"
                               className="expand-details-btn"
                               onClick={(e) => toggleExpand(e, el.id)}
                             >
@@ -658,7 +658,7 @@ export default function StudentPortal() {
 
                               <div className="elective-footer">
                                 <span className="teacher-info">Prof: {el.profesor || 'Docente UTP'}</span>
-                                
+
                                 <div className="seats-info">
                                   <Users size={14} />
                                   <span>{el.cupos_ocupados} / {el.cupos_maximos} cupos</span>
@@ -666,8 +666,8 @@ export default function StudentPortal() {
                               </div>
 
                               <div className="seat-bar">
-                                <div 
-                                  className="seat-bar-fill" 
+                                <div
+                                  className="seat-bar-fill"
                                   style={{ width: `${Math.min(100, (el.cupos_ocupados / el.cupos_maximos) * 100)}%` }}
                                 />
                               </div>
@@ -685,8 +685,8 @@ export default function StudentPortal() {
                                     <span>Ya estás en Lista de Espera</span>
                                   </button>
                                 ) : (
-                                  <button 
-                                    type="button" 
+                                  <button
+                                    type="button"
                                     className="laap-btn-warning full-width"
                                     onClick={() => handleJoinWaitlist(el)}
                                     disabled={!isProcessOpen}
@@ -705,7 +705,7 @@ export default function StudentPortal() {
                                 <div className="select-indicator desktop-only">
                                   {!isProcessOpen ? 'Proceso Cerrado' : isSelected ? 'Asignatura Seleccionada' : 'Haga clic para seleccionar'}
                                 </div>
-                                
+
                                 {/* Mobile Action Button */}
                                 <div className="mobile-action-bar" onClick={(e) => e.stopPropagation()}>
                                   {isSelected ? (
@@ -714,8 +714,8 @@ export default function StudentPortal() {
                                       <span>Seleccionado</span>
                                     </div>
                                   ) : (
-                                    <button 
-                                      type="button" 
+                                    <button
+                                      type="button"
                                       className="select-compact-btn"
                                       disabled={!isProcessOpen}
                                       onClick={() => isProcessOpen && handleSelect(h.nombre, el)}
