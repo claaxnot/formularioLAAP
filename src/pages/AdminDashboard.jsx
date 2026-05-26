@@ -404,15 +404,24 @@ export default function AdminDashboard() {
   const handleDeletePostulacion = async (postItem) => {
     const studentName = getAlumnoName(postItem.alumno_id);
     showConfirm(
-      `¿Liberar completamente la selección de electivos del alumno ${studentName}? Esto eliminará sus 3 asignaturas asignadas y le permitirá volver a realizar su postulación en el portal.`,
+      `¿Liberar completamente la selección de electivos y modalidad del alumno ${studentName}? Esto eliminará sus postulaciones, liberará sus cupos y borrará su modalidad elegida para que pueda iniciar de nuevo en el portal.`,
       async () => {
         try {
-          const { error } = await supabase.from('postulaciones').delete().eq('alumno_id', postItem.alumno_id);
-          if (error) throw error;
-          showToast(`Selección de ${studentName} liberada y reiniciada correctamente.`, 'success');
+          // 1. Borrar postulaciones
+          const { error: postErr } = await supabase.from('postulaciones').delete().eq('alumno_id', postItem.alumno_id);
+          if (postErr) throw postErr;
+
+          // 2. Borrar elecciones_modalidad
+          const { error: modErr } = await supabase.from('elecciones_modalidad').delete().eq('alumno_id', postItem.alumno_id);
+          if (modErr && modErr.code !== 'PGRST116') console.warn("No se pudo eliminar de elecciones_modalidad:", modErr);
+
+          // 3. Borrar del localStorage local
+          localStorage.removeItem(`modalidad_${postItem.alumno_id}`);
+
+          showToast(`Selección y modalidad de ${studentName} reiniciadas correctamente.`, 'success');
           await fetchAdminData(false);
         } catch (err) {
-          showToast("Error al liberar postulación: " + err.message, 'error');
+          showToast("Error al liberar estudiante: " + err.message, 'error');
         }
       }
     );
@@ -421,15 +430,24 @@ export default function AdminDashboard() {
   // Reiniciar selección desde el Roster General de alumnos
   const handleResetStudentSelections = async (student) => {
     showConfirm(
-      `¿Seguro que deseas reiniciar completamente la selección de electivos de ${student.nombre_completo}? Esto eliminará sus 3 postulaciones actuales para que pueda postular de nuevo.`,
+      `¿Seguro que deseas reiniciar completamente el proceso de ${student.nombre_completo}? Esto eliminará sus postulaciones de electivos y borrará su modalidad declarada (TP / CH) para que pueda iniciar desde cero.`,
       async () => {
         try {
-          const { error } = await supabase.from('postulaciones').delete().eq('alumno_id', student.id);
-          if (error) throw error;
-          showToast(`Selección de ${student.nombre_completo} reiniciada con éxito.`, 'success');
+          // 1. Borrar postulaciones
+          const { error: postErr } = await supabase.from('postulaciones').delete().eq('alumno_id', student.id);
+          if (postErr) throw postErr;
+
+          // 2. Borrar elecciones_modalidad
+          const { error: modErr } = await supabase.from('elecciones_modalidad').delete().eq('alumno_id', student.id);
+          if (modErr && modErr.code !== 'PGRST116') console.warn("No se pudo eliminar de elecciones_modalidad:", modErr);
+
+          // 3. Borrar del localStorage local
+          localStorage.removeItem(`modalidad_${student.id}`);
+
+          showToast(`Proceso y modalidad de ${student.nombre_completo} reiniciados con éxito.`, 'success');
           await fetchAdminData(false);
         } catch (err) {
-          showToast("Error al reiniciar selección: " + err.message, 'error');
+          showToast("Error al reiniciar estudiante: " + err.message, 'error');
         }
       }
     );
@@ -1349,6 +1367,7 @@ export default function AdminDashboard() {
                         <th>Estudiante</th>
                         <th>Correo</th>
                         <th>Curso</th>
+                        <th>Modalidad</th>
                         <th>Estado Formulario</th>
                         {sortedHorarios.map(h => (
                           <th key={h.id}>{h.nombre}</th>
@@ -1366,12 +1385,21 @@ export default function AdminDashboard() {
                     <tbody>
                       {filteredStudents.length === 0 ? (
                         <tr>
-                          <td colSpan="8" style={{ textAlign: 'center', padding: '24px' }}>No se encontraron alumnos que coincidan con la búsqueda.</td>
+                          <td colSpan="9" style={{ textAlign: 'center', padding: '24px' }}>No se encontraron alumnos que coincidan con la búsqueda.</td>
                         </tr>
                       ) : (
                         filteredStudents.map(st => {
                           const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
-                          const hasSubmitted = stPosts.length > 0;
+                          
+                          // Obtener modalidad cargada del alumno
+                          const stModRecord = eleccionesModalidad.find(m => m.alumno_id === st.id);
+                          const studentModality = stModRecord ? stModRecord.modalidad : null;
+                          const isTP = studentModality === 'tecnico_profesional_gastronomia';
+                          const isCH = studentModality === 'cientifico_humanista';
+                          
+                          // El proceso está finalizado/bloqueado si seleccionó TP o si tiene sus electivos seleccionados (CH completo)
+                          const hasSubmitted = isTP || stPosts.length > 0;
+                          const hasAnyRegistration = studentModality || stPosts.length > 0;
 
                           return (
                             <tr key={st.id}>
@@ -1382,18 +1410,51 @@ export default function AdminDashboard() {
                               <td>{st.correo}</td>
                               <td>{st.curso_actual || '3° Medio'}</td>
                               <td>
-                                <span className={`status-pill ${hasSubmitted ? 'available' : 'full'}`} style={{ display: 'inline-flex', padding: '4px 8px' }}>
-                                  {hasSubmitted ? 'Registrado' : 'Pendiente'}
-                                </span>
+                                {isTP ? (
+                                  <span className="role-badge admin" style={{ fontSize: '11px', fontWeight: 'bold', padding: '3px 8px' }}>
+                                    TP (Gastronomía)
+                                  </span>
+                                ) : isCH ? (
+                                  <span className="role-badge" style={{ fontSize: '11px', fontWeight: 'bold', padding: '3px 8px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa' }}>
+                                    Científico Humanista
+                                  </span>
+                                ) : (
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontStyle: 'italic' }}>
+                                    Sin Declarar
+                                  </span>
+                                )}
+                              </td>
+                              <td>
+                                {isTP ? (
+                                  <span className="status-pill available" style={{ display: 'inline-flex', padding: '4px 8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
+                                    Finalizado (TP)
+                                  </span>
+                                ) : hasSubmitted ? (
+                                  <span className="status-pill available" style={{ display: 'inline-flex', padding: '4px 8px' }}>
+                                    Listo (CH)
+                                  </span>
+                                ) : isCH ? (
+                                  <span className="status-pill full" style={{ display: 'inline-flex', padding: '4px 8px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>
+                                    En Selección CH
+                                  </span>
+                                ) : (
+                                  <span className="status-pill full" style={{ display: 'inline-flex', padding: '4px 8px' }}>
+                                    Pendiente
+                                  </span>
+                                )}
                               </td>
                               {sortedHorarios.map(h => {
                                 const post = stPosts.find(p => String(p.horario_id) === String(h.id));
                                 const electiveName = post ? getElectiveName(post.electivo_id) : '—';
                                 return (
                                   <td key={h.id} style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    <small title={electiveName} style={{ fontWeight: post ? '600' : 'normal', color: post ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '12px' }}>
-                                      {electiveName}
-                                    </small>
+                                    {isTP ? (
+                                      <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '11px' }}>Exento TP</span>
+                                    ) : (
+                                      <small title={electiveName} style={{ fontWeight: post ? '600' : 'normal', color: post ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '12px' }}>
+                                        {electiveName}
+                                      </small>
+                                    )}
                                   </td>
                                 );
                               })}
@@ -1405,11 +1466,11 @@ export default function AdminDashboard() {
                                 </>
                               )}
                               <td>
-                                {hasSubmitted ? (
+                                {hasAnyRegistration ? (
                                   <button
                                     className="btn-table-danger"
                                     onClick={() => handleResetStudentSelections(st)}
-                                    title="Reiniciar y liberar selección del alumno"
+                                    title="Reiniciar y liberar proceso del alumno"
                                     style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}
                                   >
                                     <Trash2 size={12} />
