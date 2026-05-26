@@ -133,6 +133,7 @@ export default function StudentPortal() {
 
       // 0.5. Consultar modalidad del alumno en Supabase
       let currentModalidad = null;
+      const isDemo = !!localStorage.getItem('laap_mock_session');
       try {
         const { data: modData, error: modErr } = await supabase
           .from('elecciones_modalidad')
@@ -140,17 +141,30 @@ export default function StudentPortal() {
           .eq('alumno_id', profile.id)
           .maybeSingle();
 
-        if (!modErr && modData) {
-          currentModalidad = modData.modalidad;
-        } else if (modErr && modErr.code !== 'PGRST116') {
-          console.error("Error al consultar modalidad en Supabase:", modErr);
+        if (!modErr) {
+          if (modData) {
+            currentModalidad = modData.modalidad;
+            // Sincronizar caché local con la realidad de la DB
+            localStorage.setItem(`modalidad_${profile.id}`, modData.modalidad);
+          } else {
+            // El registro no existe en la base de datos (fue eliminado por admin o nunca creado)
+            currentModalidad = null;
+            if (!isDemo) {
+              localStorage.removeItem(`modalidad_${profile.id}`);
+            }
+          }
+        } else {
+          // Si hay un error real de red/servidor, recurrir a la caché local como salvaguarda
+          if (modErr.code !== 'PGRST116') {
+            console.error("Error al consultar modalidad en Supabase:", modErr);
+          }
+          const cached = localStorage.getItem(`modalidad_${profile.id}`);
+          if (cached) {
+            currentModalidad = cached;
+          }
         }
       } catch (err) {
         console.error("Excepción al consultar modalidad:", err);
-      }
-
-      // Si no hay modalidad en la DB, buscar en localStorage
-      if (!currentModalidad) {
         const cached = localStorage.getItem(`modalidad_${profile.id}`);
         if (cached) {
           currentModalidad = cached;
