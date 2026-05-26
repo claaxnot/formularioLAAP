@@ -14,7 +14,8 @@ export default function Navbar() {
             <img src="/logo.png" alt="Liceo Arturo Alessandri Palma Logo" style={{ height: '32px', width: '32px', objectFit: 'contain' }} />
           </div>
           <div className="laap-brand-text">
-            <span className="laap-brand-title">Liceo Arturo Alessandri Palma</span>
+            <span className="laap-brand-title desktop-only">Liceo Arturo Alessandri Palma</span>
+            <span className="laap-brand-title mobile-only">L.A.A.P.</span>
             <span className="laap-brand-subtitle">Providencia</span>
           </div>
         </div>
@@ -27,11 +28,13 @@ export default function Navbar() {
                 {role === 'admin' ? (
                   <span className="role-badge admin">
                     <Award size={12} style={{ marginRight: '4px' }} />
-                    Administrador UTP
+                    <span className="desktop-only">Administrador UTP</span>
+                    <span className="mobile-only">Admin UTP</span>
                   </span>
                 ) : (
                   <span className="role-badge student">
-                    Estudiante - {profile.curso_actual || profile.curso || '3° Medio'}
+                    <span className="desktop-only">Estudiante - {profile.curso_actual || profile.curso || '3° Medio'}</span>
+                    <span className="mobile-only">{profile.curso_actual || profile.curso || '3° Medio'}</span>
                   </span>
                 )}
               </span>

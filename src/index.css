@@ -1548,7 +1548,18 @@ body {
   display: none;
 }
 
+.mobile-only {
+  display: none !important;
+}
+
 @media (max-width: 640px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: inline !important;
+  }
+
   /* Barra de Navegación Compacta Móvil */
   .laap-navbar {
     padding: 8px 12px !important;
@@ -1586,15 +1597,19 @@ body {
   }
   
   .laap-user-name {
-    font-size: 0.8rem !important;
-    max-width: 100px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    max-width: 170px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
   }
   
   .laap-user-detail {
-    display: none !important; /* Ocultar rol/curso en navbar móvil para evitar superposición */
+    display: flex !important; /* Mostrar curso en móvil */
+    font-size: 0.65rem !important;
+    color: #94a3b8 !important;
+    margin-top: 1px !important;
   }
   
   .laap-btn-logout {
