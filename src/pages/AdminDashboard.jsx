@@ -1194,6 +1194,7 @@ export default function AdminDashboard() {
 
         {activeTab === 'alumnos' && (() => {
           const uniqueCursos = Array.from(new Set(students.map(s => s.curso_actual).filter(Boolean))).sort();
+          const sortedHorarios = [...horarios].sort((a, b) => a.orden - b.orden);
           
           const filteredStudents = students.filter(st => {
             const query = rosterSearchQuery.trim().toLowerCase();
@@ -1285,9 +1286,16 @@ export default function AdminDashboard() {
                         <th>Correo</th>
                         <th>Curso</th>
                         <th>Estado Formulario</th>
-                        <th>Horario 1</th>
-                        <th>Horario 2</th>
-                        <th>Horario 3</th>
+                        {sortedHorarios.map(h => (
+                          <th key={h.id}>{h.nombre}</th>
+                        ))}
+                        {sortedHorarios.length === 0 && (
+                          <>
+                            <th>Horario 1</th>
+                            <th>Horario 2</th>
+                            <th>Horario 3</th>
+                          </>
+                        )}
                         <th>Acción</th>
                       </tr>
                     </thead>
@@ -1300,14 +1308,6 @@ export default function AdminDashboard() {
                         filteredStudents.map(st => {
                           const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
                           const hasSubmitted = stPosts.length > 0;
-                          
-                          const h1Id = stPosts.find(p => String(p.horario_id) === '1')?.electivo_id;
-                          const h2Id = stPosts.find(p => String(p.horario_id) === '2')?.electivo_id;
-                          const h3Id = stPosts.find(p => String(p.horario_id) === '3')?.electivo_id;
-
-                          const h1 = h1Id ? getElectiveName(h1Id) : '—';
-                          const h2 = h2Id ? getElectiveName(h2Id) : '—';
-                          const h3 = h3Id ? getElectiveName(h3Id) : '—';
 
                           return (
                             <tr key={st.id}>
@@ -1322,9 +1322,24 @@ export default function AdminDashboard() {
                                   {hasSubmitted ? 'Registrado' : 'Pendiente'}
                                 </span>
                               </td>
-                              <td><small>{h1}</small></td>
-                              <td><small>{h2}</small></td>
-                              <td><small>{h3}</small></td>
+                              {sortedHorarios.map(h => {
+                                const post = stPosts.find(p => String(p.horario_id) === String(h.id));
+                                const electiveName = post ? getElectiveName(post.electivo_id) : '—';
+                                return (
+                                  <td key={h.id} style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    <small title={electiveName} style={{ fontWeight: post ? 'bold' : 'normal', color: post ? '#f3f4f6' : 'var(--text-secondary)' }}>
+                                      {electiveName}
+                                    </small>
+                                  </td>
+                                );
+                              })}
+                              {sortedHorarios.length === 0 && (
+                                <>
+                                  <td>—</td>
+                                  <td>—</td>
+                                  <td>—</td>
+                                </>
+                              )}
                               <td>
                                 {hasSubmitted ? (
                                   <button 
