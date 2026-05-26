@@ -2,17 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import Navbar from '../components/Navbar';
-import { 
-  BarChart3, 
-  Users, 
-  BookOpen, 
-  FileSpreadsheet, 
-  Plus, 
-  Edit3, 
-  Trash2, 
-  Search, 
-  CheckCircle, 
-  Clock, 
+import {
+  BarChart3,
+  Users,
+  BookOpen,
+  FileSpreadsheet,
+  Plus,
+  Edit3,
+  Trash2,
+  Search,
+  CheckCircle,
+  Clock,
   ListOrdered,
   AlertTriangle,
   GraduationCap
@@ -68,8 +68,8 @@ export default function AdminDashboard() {
     descripcion: '',
     docente: '',
     cupos_maximos: 15,
-    horario_id: 1,
-    area_id: 'A',
+    horario_id: '',
+    area_id: '',
     activo: true,
     nivel_destino: '3M'
   });
@@ -83,7 +83,7 @@ export default function AdminDashboard() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);  const fetchAdminData = async (showFullSpinner = true) => {
+  }, []); const fetchAdminData = async (showFullSpinner = true) => {
     if (showFullSpinner) {
       setLoading(true);
     }
@@ -214,7 +214,7 @@ export default function AdminDashboard() {
           .update({ activo: true })
           .eq('id', activeProcess.id)
           .select();
-        
+
         if (error) throw error;
         showToast(`Proceso de postulaciones para ${label} abierto correctamente.`, 'success');
       } else {
@@ -227,7 +227,7 @@ export default function AdminDashboard() {
             nivel_destino: nivelDestino
           })
           .select();
-        
+
         if (error) throw error;
         showToast(`Proceso 'Toma de Electivos ${label} 2026' creado y abierto correctamente.`, 'success');
       }
@@ -260,7 +260,7 @@ export default function AdminDashboard() {
             .select();
 
           console.log("Respuesta de Supabase update (Cerrar):", { data, error });
-          
+
           if (!error && (!data || data.length === 0)) {
             console.warn("La actualización por ID no devolvió filas. Ejecutando actualización global de seguridad...");
             const { error: globalErr } = await supabase
@@ -360,7 +360,7 @@ export default function AdminDashboard() {
         descripcion: currentElective.descripcion,
         docente: currentElective.docente,
         cupos_maximos: parseInt(currentElective.cupos_maximos, 10),
-        horario_id: parseInt(currentElective.horario_id, 10),
+        horario_id: currentElective.horario_id,
         area_id: currentElective.area_id,
         activo: currentElective.activo,
         nivel_destino: currentElective.nivel_destino || '3M'
@@ -374,7 +374,7 @@ export default function AdminDashboard() {
         if (error) throw error;
         showToast("Electivo actualizado exitosamente.", 'success');
       }
-      
+
       await fetchAdminData(false);
       setShowModal(false);
     } catch (err) {
@@ -444,9 +444,9 @@ export default function AdminDashboard() {
       nombre: '',
       descripcion: '',
       docente: '',
-      cupos_maximos: 15,
-      horario_id: 1,
-      area_id: 'A',
+      cupos_maximos: 35,
+      horario_id: horarios && horarios.length > 0 ? horarios[0].id : '1',
+      area_id: areas && areas.length > 0 ? areas[0].id : 'A',
       activo: true,
       nivel_destino: defaultNivel
     });
@@ -474,11 +474,11 @@ export default function AdminDashboard() {
   const handleExportCSV = () => {
     const rosterRows = students.map(st => {
       const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
-      
+
       const h1Id = stPosts.find(p => String(p.horario_id) === '1')?.electivo_id;
       const h2Id = stPosts.find(p => String(p.horario_id) === '2')?.electivo_id;
       const h3Id = stPosts.find(p => String(p.horario_id) === '3')?.electivo_id;
-      
+
       const h1 = h1Id ? getElectiveName(h1Id) : 'Pendiente';
       const h2 = h2Id ? getElectiveName(h2Id) : 'Pendiente';
       const h3 = h3Id ? getElectiveName(h3Id) : 'Pendiente';
@@ -505,7 +505,7 @@ export default function AdminDashboard() {
 
     let csvContent = "\uFEFF"; // UTF-8 BOM
     csvContent += "ID Alumno,Nombre Estudiante,Correo Institucional,Curso Actual,Nivel Destino,Selección Horario 1,Selección Horario 2,Selección Horario 3,En Lista de Espera\n";
-    
+
     rosterRows.forEach(row => {
       csvContent += `"${row.id}","${row.nombre}","${row.correo}","${row.curso}","${row.nivel_destino}","${row.h1}","${row.h2}","${row.h3}","${row.waitlist}"\n`;
     });
@@ -525,7 +525,7 @@ export default function AdminDashboard() {
   const handleExportModalidadesCSV = () => {
     let csvContent = "\uFEFF"; // UTF-8 BOM
     csvContent += "Nombre Estudiante,RUT,Correo,Curso Actual,Modalidad Seleccionada,Fecha Registro\n";
-    
+
     eleccionesModalidad.forEach(row => {
       const st = students.find(s => s.id === row.alumno_id) || {};
       const modLabel = row.modalidad === 'cientifico_humanista' ? 'Científico Humanista' : 'Técnico Profesional (Gastronomía)';
@@ -636,8 +636,8 @@ export default function AdminDashboard() {
             lineHeight: '1.4'
           }}>
             ⚠️ {errorMsg}
-            <button 
-              onClick={() => fetchAdminData(true)} 
+            <button
+              onClick={() => fetchAdminData(true)}
               style={{ background: 'none', border: 'none', color: '#60a5fa', textDecoration: 'underline', cursor: 'pointer', marginLeft: '8px', padding: 0 }}
             >
               Reintentar Consulta
@@ -701,16 +701,16 @@ export default function AdminDashboard() {
                 </strong>
               </div>
               {activeProcess3M?.activo ? (
-                <button 
-                  onClick={() => handleCloseProcess('3M')} 
+                <button
+                  onClick={() => handleCloseProcess('3M')}
                   className="laap-btn-danger"
                   style={{ margin: 0, padding: '6px 12px', fontSize: '12px' }}
                 >
                   Cerrar
                 </button>
               ) : (
-                <button 
-                  onClick={() => handleOpenProcess('3M')} 
+                <button
+                  onClick={() => handleOpenProcess('3M')}
                   className="laap-btn-success"
                   style={{ margin: 0, padding: '6px 12px', fontSize: '12px' }}
                 >
@@ -754,16 +754,16 @@ export default function AdminDashboard() {
                 </strong>
               </div>
               {activeProcess4M?.activo ? (
-                <button 
-                  onClick={() => handleCloseProcess('4M')} 
+                <button
+                  onClick={() => handleCloseProcess('4M')}
                   className="laap-btn-danger"
                   style={{ margin: 0, padding: '6px 12px', fontSize: '12px' }}
                 >
                   Cerrar
                 </button>
               ) : (
-                <button 
-                  onClick={() => handleOpenProcess('4M')} 
+                <button
+                  onClick={() => handleOpenProcess('4M')}
                   className="laap-btn-success"
                   style={{ margin: 0, padding: '6px 12px', fontSize: '12px' }}
                 >
@@ -776,49 +776,49 @@ export default function AdminDashboard() {
 
         {/* Pestañas de Navegación */}
         <div className="admin-tabs">
-          <button 
+          <button
             className={`admin-tab-btn ${activeTab === 'stats' ? 'active' : ''}`}
             onClick={() => setActiveTab('stats')}
           >
             <BarChart3 size={16} />
             <span>Estadísticas</span>
           </button>
-          <button 
+          <button
             className={`admin-tab-btn ${activeTab === 'postulaciones' ? 'active' : ''}`}
             onClick={() => setActiveTab('postulaciones')}
           >
             <CheckCircle size={16} />
             <span>Postulaciones ({postulaciones.length / 3})</span>
           </button>
-          <button 
+          <button
             className={`admin-tab-btn ${activeTab === 'lista_espera' ? 'active' : ''}`}
             onClick={() => setActiveTab('lista_espera')}
           >
             <ListOrdered size={16} />
             <span>Listas de Espera ({waitlist.length})</span>
           </button>
-          <button 
+          <button
             className={`admin-tab-btn ${activeTab === 'electivos_3m' ? 'active' : ''}`}
             onClick={() => setActiveTab('electivos_3m')}
           >
             <BookOpen size={16} />
             <span>Gestionar 3° Medio ({electives.filter(e => e.nivel_destino === '3M').length})</span>
           </button>
-          <button 
+          <button
             className={`admin-tab-btn ${activeTab === 'electivos_4m' ? 'active' : ''}`}
             onClick={() => setActiveTab('electivos_4m')}
           >
             <BookOpen size={16} />
             <span>Gestionar 4° Medio ({electives.filter(e => e.nivel_destino === '4M').length})</span>
           </button>
-          <button 
+          <button
             className={`admin-tab-btn ${activeTab === 'alumnos' ? 'active' : ''}`}
             onClick={() => setActiveTab('alumnos')}
           >
             <Users size={16} />
             <span>Roster Alumnos ({students.length})</span>
           </button>
-          <button 
+          <button
             className={`admin-tab-btn ${activeTab === 'modalidades_tp' ? 'active' : ''}`}
             onClick={() => setActiveTab('modalidades_tp')}
           >
@@ -899,7 +899,7 @@ export default function AdminDashboard() {
             <div className="admin-section-card">
               <h2>Monitoreo de Vacantes por Asignatura</h2>
               <p>Capacidad real y demanda inmediata de cada electivo.</p>
-              
+
               <div className="stats-electives-list">
                 {(() => {
                   const statsCuposFiltered = cupos.filter(c => {
@@ -923,7 +923,7 @@ export default function AdminDashboard() {
                             {el.horario_nombre || `Horario ${order}`} | Área {el.area_codigo || 'A'} | Profesor {el.profesor || el.docente || 'Docente UTP'}
                           </span>
                         </div>
-                        
+
                         <div className="stat-el-progress-col">
                           <div className="stat-progress-bar-container">
                             <div className={`stat-progress-bar ${percent >= 100 ? 'full' : ''}`} style={{ width: `${percent}%` }} />
@@ -947,8 +947,8 @@ export default function AdminDashboard() {
                 <div className="filters-wrapper">
                   <div className="search-box">
                     <Search size={16} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="Buscar alumno..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
@@ -999,7 +999,7 @@ export default function AdminDashboard() {
                               <td>{new Date(p.created_at).toLocaleString('es-CL')}</td>
                               <td>
                                 <div style={{ display: 'flex', gap: '6px' }}>
-                                  <button 
+                                  <button
                                     className="btn-table-edit"
                                     onClick={() => handleOpenEditPostulacionModal(p)}
                                     title="Modificar asignatura de esta postulación"
@@ -1008,7 +1008,7 @@ export default function AdminDashboard() {
                                     <Edit3 size={12} />
                                     <span>Editar</span>
                                   </button>
-                                  <button 
+                                  <button
                                     className="btn-table-danger"
                                     onClick={() => handleDeletePostulacion(p)}
                                     title="Liberar selección completa de este alumno"
@@ -1069,7 +1069,7 @@ export default function AdminDashboard() {
                             <td>{getScheduleName(matchedElective.horario_id || 1)}</td>
                             <td>{new Date(w.created_at).toLocaleString('es-CL')}</td>
                             <td>
-                              <button 
+                              <button
                                 className="btn-table-danger"
                                 onClick={async () => {
                                   if (window.confirm("¿Retirar de la lista de espera?")) {
@@ -1259,10 +1259,10 @@ export default function AdminDashboard() {
         {activeTab === 'alumnos' && (() => {
           const uniqueCursos = Array.from(new Set(students.map(s => s.curso_actual).filter(Boolean))).sort();
           const sortedHorarios = [...horarios].sort((a, b) => a.orden - b.orden);
-          
+
           const filteredStudents = students.filter(st => {
             const query = rosterSearchQuery.trim().toLowerCase();
-            const matchesSearch = !query || 
+            const matchesSearch = !query ||
               (st.nombre_completo || '').toLowerCase().includes(query) ||
               (st.rut || '').toLowerCase().includes(query) ||
               (st.correo || '').toLowerCase().includes(query);
@@ -1301,8 +1301,8 @@ export default function AdminDashboard() {
                     minWidth: '240px'
                   }}>
                     <Search size={16} style={{ color: '#9ca3af' }} />
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="Buscar alumno por nombre, RUT o correo..."
                       value={rosterSearchQuery}
                       onChange={(e) => setRosterSearchQuery(e.target.value)}
@@ -1406,7 +1406,7 @@ export default function AdminDashboard() {
                               )}
                               <td>
                                 {hasSubmitted ? (
-                                  <button 
+                                  <button
                                     className="btn-table-danger"
                                     onClick={() => handleResetStudentSelections(st)}
                                     title="Reiniciar y liberar selección del alumno"
@@ -1569,22 +1569,22 @@ export default function AdminDashboard() {
               <form onSubmit={handleSaveElective} className="modal-form">
                 <div className="form-group">
                   <label>Nombre de la Asignatura</label>
-                  <input 
-                    type="text" 
-                    required 
+                  <input
+                    type="text"
+                    required
                     value={currentElective.nombre ?? ""}
-                    onChange={(e) => setCurrentElective({...currentElective, nombre: e.target.value})}
+                    onChange={(e) => setCurrentElective({ ...currentElective, nombre: e.target.value })}
                     placeholder="Ej. Robótica Avanzada"
                   />
                 </div>
 
                 <div className="form-group">
                   <label>Descripción Académica</label>
-                  <textarea 
+                  <textarea
                     rows="3"
                     required
                     value={currentElective.descripcion ?? ""}
-                    onChange={(e) => setCurrentElective({...currentElective, descripcion: e.target.value})}
+                    onChange={(e) => setCurrentElective({ ...currentElective, descripcion: e.target.value })}
                     placeholder="Detalles sobre el contenido del curso..."
                   />
                 </div>
@@ -1592,22 +1592,22 @@ export default function AdminDashboard() {
                 <div className="form-row-2">
                   <div className="form-group">
                     <label>Docente / Profesor</label>
-                    <input 
-                      type="text" 
-                      required 
+                    <input
+                      type="text"
+                      required
                       value={currentElective.docente ?? ""}
-                      onChange={(e) => setCurrentElective({...currentElective, docente: e.target.value})}
+                      onChange={(e) => setCurrentElective({ ...currentElective, docente: e.target.value })}
                       placeholder="Ej. Ing. Alan Turing"
                     />
                   </div>
                   <div className="form-group">
                     <label>Cupos Totales (Capacidad)</label>
-                    <input 
-                      type="number" 
-                      required 
+                    <input
+                      type="number"
+                      required
                       min="1"
                       value={currentElective.cupos_maximos ?? 35}
-                      onChange={(e) => setCurrentElective({...currentElective, cupos_maximos: e.target.value})}
+                      onChange={(e) => setCurrentElective({ ...currentElective, cupos_maximos: e.target.value })}
                       placeholder="15"
                     />
                   </div>
@@ -1616,9 +1616,9 @@ export default function AdminDashboard() {
                 <div className="form-row-2">
                   <div className="form-group">
                     <label>Horario Asignado</label>
-                    <select 
+                    <select
                       value={currentElective.horario_id ?? ""}
-                      onChange={(e) => setCurrentElective({...currentElective, horario_id: e.target.value})}
+                      onChange={(e) => setCurrentElective({ ...currentElective, horario_id: e.target.value })}
                     >
                       {horarios.map(h => (
                         <option key={h.id} value={h.id}>{h.nombre}</option>
@@ -1634,9 +1634,9 @@ export default function AdminDashboard() {
                   </div>
                   <div className="form-group">
                     <label>Área Temática</label>
-                    <select 
+                    <select
                       value={currentElective.area_id ?? ""}
-                      onChange={(e) => setCurrentElective({...currentElective, area_id: e.target.value})}
+                      onChange={(e) => setCurrentElective({ ...currentElective, area_id: e.target.value })}
                     >
                       {areas.map(a => (
                         <option key={a.id} value={a.id}>Área {a.codigo || a.nombre}</option>
@@ -1655,20 +1655,20 @@ export default function AdminDashboard() {
                 <div className="form-row-2" style={{ marginTop: '12px' }}>
                   <div className="form-group">
                     <label>Nivel de Destino (Proceso)</label>
-                    <select 
+                    <select
                       value={currentElective.nivel_destino ?? "3M"}
-                      onChange={(e) => setCurrentElective({...currentElective, nivel_destino: e.target.value})}
+                      onChange={(e) => setCurrentElective({ ...currentElective, nivel_destino: e.target.value })}
                     >
                       <option value="3M">3° Medio (Actuales 2° Medio)</option>
                       <option value="4M">4° Medio (Actuales 3° Medio)</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '24px' }}>
-                    <input 
-                      type="checkbox" 
-                      id="elActivo" 
-                      checked={currentElective.activo ?? true} 
-                      onChange={(e) => setCurrentElective({...currentElective, activo: e.target.checked})} 
+                    <input
+                      type="checkbox"
+                      id="elActivo"
+                      checked={currentElective.activo ?? true}
+                      onChange={(e) => setCurrentElective({ ...currentElective, activo: e.target.checked })}
                     />
                     <label htmlFor="elActivo" style={{ cursor: 'pointer', fontWeight: 'bold' }}>Electivo Activo y Habilitado</label>
                   </div>
@@ -1691,9 +1691,9 @@ export default function AdminDashboard() {
         {editingPostulacion && (() => {
           const student = students.find(s => s.id === editingPostulacion.alumno_id) || {};
           const nivelDestino = getStudentNivelDestino(student.curso_actual) || '3M';
-          const availableElectives = electives.filter(e => 
-            e.activo && 
-            String(e.horario_id) === String(editingPostulacion.horario_id) && 
+          const availableElectives = electives.filter(e =>
+            e.activo &&
+            String(e.horario_id) === String(editingPostulacion.horario_id) &&
             e.nivel_destino === nivelDestino
           );
 
@@ -1753,16 +1753,16 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="modal-actions" style={{ marginTop: '20px' }}>
-                    <button 
-                      type="button" 
-                      className="laap-btn-text" 
+                    <button
+                      type="button"
+                      className="laap-btn-text"
                       onClick={() => setEditingPostulacion(null)}
                       disabled={savingPostulacion}
                     >
                       Cancelar
                     </button>
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="laap-btn-primary"
                       disabled={savingPostulacion || !newElectiveId}
                     >
