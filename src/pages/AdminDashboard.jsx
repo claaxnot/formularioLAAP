@@ -50,6 +50,8 @@ export default function AdminDashboard() {
 
   // Search Filter
   const [searchQuery, setSearchQuery] = useState('');
+  const [rosterSearchQuery, setRosterSearchQuery] = useState('');
+  const [rosterCursoFilter, setRosterCursoFilter] = useState('all');
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('create'); // 'create' or 'edit'
@@ -1128,85 +1130,165 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'alumnos' && (
-          <div className="admin-tab-content animate-fadeIn">
-            <div className="admin-section-card">
-              <h2>Roster General de Estudiantes</h2>
-              <p>Visualización del estado de postulación por cada estudiante registrado en la matrícula.</p>
+        {activeTab === 'alumnos' && (() => {
+          const uniqueCursos = Array.from(new Set(students.map(s => s.curso_actual).filter(Boolean))).sort();
+          
+          const filteredStudents = students.filter(st => {
+            const query = rosterSearchQuery.trim().toLowerCase();
+            const matchesSearch = !query || 
+              (st.nombre_completo || '').toLowerCase().includes(query) ||
+              (st.rut || '').toLowerCase().includes(query) ||
+              (st.correo || '').toLowerCase().includes(query);
+            const matchesCurso = rosterCursoFilter === 'all' || st.curso_actual === rosterCursoFilter;
+            return matchesSearch && matchesCurso;
+          });
 
-              <div className="table-responsive">
-                <table className="laap-admin-table">
-                  <thead>
-                    <tr>
-                      <th>Estudiante</th>
-                      <th>Correo</th>
-                      <th>Curso</th>
-                      <th>Estado Formulario</th>
-                      <th>Horario 1</th>
-                      <th>Horario 2</th>
-                      <th>Horario 3</th>
-                      <th>Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students.length === 0 ? (
+          return (
+            <div className="admin-tab-content animate-fadeIn">
+              <div className="admin-section-card">
+                <h2>Roster General de Estudiantes</h2>
+                <p>Visualización del estado de postulación por cada estudiante registrado en la matrícula.</p>
+
+                {/* Filtros de Roster */}
+                <div style={{
+                  display: 'flex',
+                  gap: '16px',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  marginBottom: '20px'
+                }}>
+                  {/* Caja de Búsqueda */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '6px',
+                    padding: '6px 12px',
+                    flex: 1,
+                    minWidth: '240px'
+                  }}>
+                    <Search size={16} style={{ color: '#9ca3af' }} />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar alumno por nombre, RUT o correo..."
+                      value={rosterSearchQuery}
+                      onChange={(e) => setRosterSearchQuery(e.target.value)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'white',
+                        outline: 'none',
+                        width: '100%',
+                        fontSize: '13px'
+                      }}
+                    />
+                  </div>
+
+                  {/* Filtro de Curso */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#9ca3af' }}>Curso:</span>
+                    <select
+                      value={rosterCursoFilter}
+                      onChange={(e) => setRosterCursoFilter(e.target.value)}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                        color: 'white',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="all" style={{ backgroundColor: '#1f2937' }}>Todos los Cursos</option>
+                      {uniqueCursos.map(curso => (
+                        <option key={curso} value={curso} style={{ backgroundColor: '#1f2937' }}>{curso}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="table-responsive">
+                  <table className="laap-admin-table">
+                    <thead>
                       <tr>
-                        <td colSpan="8" style={{ textAlign: 'center', padding: '24px' }}>No hay registros disponibles.</td>
+                        <th>Estudiante</th>
+                        <th>Correo</th>
+                        <th>Curso</th>
+                        <th>Estado Formulario</th>
+                        <th>Horario 1</th>
+                        <th>Horario 2</th>
+                        <th>Horario 3</th>
+                        <th>Acción</th>
                       </tr>
-                    ) : (
-                      students.map(st => {
-                        const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
-                        const hasSubmitted = stPosts.length > 0;
-                        
-                        const h1Id = stPosts.find(p => String(p.horario_id) === '1')?.electivo_id;
-                        const h2Id = stPosts.find(p => String(p.horario_id) === '2')?.electivo_id;
-                        const h3Id = stPosts.find(p => String(p.horario_id) === '3')?.electivo_id;
+                    </thead>
+                    <tbody>
+                      {filteredStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" style={{ textAlign: 'center', padding: '24px' }}>No se encontraron alumnos que coincidan con la búsqueda.</td>
+                        </tr>
+                      ) : (
+                        filteredStudents.map(st => {
+                          const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
+                          const hasSubmitted = stPosts.length > 0;
+                          
+                          const h1Id = stPosts.find(p => String(p.horario_id) === '1')?.electivo_id;
+                          const h2Id = stPosts.find(p => String(p.horario_id) === '2')?.electivo_id;
+                          const h3Id = stPosts.find(p => String(p.horario_id) === '3')?.electivo_id;
 
-                        const h1 = h1Id ? getElectiveName(h1Id) : '—';
-                        const h2 = h2Id ? getElectiveName(h2Id) : '—';
-                        const h3 = h3Id ? getElectiveName(h3Id) : '—';
+                          const h1 = h1Id ? getElectiveName(h1Id) : '—';
+                          const h2 = h2Id ? getElectiveName(h2Id) : '—';
+                          const h3 = h3Id ? getElectiveName(h3Id) : '—';
 
-                        return (
-                          <tr key={st.id}>
-                            <td>
-                              <strong>{st.nombre_completo}</strong>
-                              <span style={{ fontSize: '10px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>ID: {st.id}</span>
-                            </td>
-                            <td>{st.correo}</td>
-                            <td>{st.curso_actual || '3° Medio'}</td>
-                            <td>
-                              <span className={`status-pill ${hasSubmitted ? 'available' : 'full'}`} style={{ display: 'inline-flex', padding: '4px 8px' }}>
-                                {hasSubmitted ? 'Registrado' : 'Pendiente'}
-                              </span>
-                            </td>
-                            <td><small>{h1}</small></td>
-                            <td><small>{h2}</small></td>
-                            <td><small>{h3}</small></td>
-                            <td>
-                              {hasSubmitted ? (
-                                <button 
-                                  className="btn-table-danger"
-                                  onClick={() => handleResetStudentSelections(st)}
-                                  title="Reiniciar y liberar selección del alumno"
-                                  style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}
-                                >
-                                  <Trash2 size={12} />
-                                  <span>Reiniciar</span>
-                                </button>
-                              ) : (
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>—</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                          return (
+                            <tr key={st.id}>
+                              <td>
+                                <strong>{st.nombre_completo}</strong>
+                                <span style={{ fontSize: '10px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>ID: {st.id}</span>
+                              </td>
+                              <td>{st.correo}</td>
+                              <td>{st.curso_actual || '3° Medio'}</td>
+                              <td>
+                                <span className={`status-pill ${hasSubmitted ? 'available' : 'full'}`} style={{ display: 'inline-flex', padding: '4px 8px' }}>
+                                  {hasSubmitted ? 'Registrado' : 'Pendiente'}
+                                </span>
+                              </td>
+                              <td><small>{h1}</small></td>
+                              <td><small>{h2}</small></td>
+                              <td><small>{h3}</small></td>
+                              <td>
+                                {hasSubmitted ? (
+                                  <button 
+                                    className="btn-table-danger"
+                                    onClick={() => handleResetStudentSelections(st)}
+                                    title="Reiniciar y liberar selección del alumno"
+                                    style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}
+                                  >
+                                    <Trash2 size={12} />
+                                    <span>Reiniciar</span>
+                                  </button>
+                                ) : (
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* MODAL CREAR / EDITAR ELECTIVO */}
         {showModal && (
