@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import Navbar from '../components/Navbar';
+import { formatNombre } from '../utils/formatters';
 import {
   CheckCircle,
   AlertTriangle,
@@ -611,7 +612,7 @@ export default function StudentPortal() {
                 Selección de Modalidad Académica
               </h2>
               <p style={{ color: 'var(--text-secondary, #9ca3af)', fontSize: '14px', margin: 0 }}>
-                Estimado/a <strong>{profile?.nombre_completo}</strong> (RUT: {profile?.rut || 'No registrado'}), debes declarar tu modalidad educativa para continuar.
+                Estimado/a <strong>{formatNombre(profile?.nombre_completo)}</strong> (RUT: {profile?.rut || 'No registrado'}), debes declarar tu modalidad educativa para continuar.
               </p>
             </div>
 
@@ -951,7 +952,7 @@ export default function StudentPortal() {
             {getUpdateIndicator()}
           </div>
           <p>
-            Estimado/a <strong>{profile?.nombre_completo || 'Estudiante'}</strong> (Curso: <strong>{profile?.curso_actual || '3° Medio'}</strong>), selecciona tus asignaturas electivas para el ciclo académico vigente. Recuerda las siguientes normativas:
+            Estimado/a <strong>{formatNombre(profile?.nombre_completo) || 'Estudiante'}</strong> (Curso: <strong>{profile?.curso_actual || '3° Medio'}</strong>), selecciona tus asignaturas electivas para el ciclo académico vigente. Recuerda las siguientes normativas:
           </p>
           <div className="rules-grid">
             <div className="rule-item">

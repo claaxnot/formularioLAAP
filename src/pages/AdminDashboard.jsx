@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../utils/supabaseClient';
 import Navbar from '../components/Navbar';
+import { formatNombre } from '../utils/formatters';
 import {
   BarChart3,
   Users,
@@ -298,7 +299,7 @@ export default function AdminDashboard() {
   // Lookup Helpers for Client-Side Crossing
   const getAlumnoName = (alumnoId) => {
     const student = students.find(s => s.id === alumnoId);
-    return student ? student.nombre_completo : 'Desconocido';
+    return student ? formatNombre(student.nombre_completo) : 'Desconocido';
   };
   const getAlumnoEmail = (alumnoId) => {
     const student = students.find(s => s.id === alumnoId);
@@ -442,8 +443,9 @@ export default function AdminDashboard() {
 
   // Reiniciar selección desde el Roster General de alumnos
   const handleResetStudentSelections = async (student) => {
+    const formattedName = formatNombre(student.nombre_completo);
     showConfirm(
-      `¿Seguro que deseas reiniciar completamente el proceso de ${student.nombre_completo}? Esto eliminará sus postulaciones de electivos y borrará su modalidad declarada (TP / CH) para que pueda iniciar desde cero.`,
+      `¿Seguro que deseas reiniciar completamente el proceso de ${formattedName}? Esto eliminará sus postulaciones de electivos y borrará su modalidad declarada (TP / CH) para que pueda iniciar desde cero.`,
       async () => {
         try {
           // 1. Borrar postulaciones
@@ -457,7 +459,7 @@ export default function AdminDashboard() {
           // 3. Borrar del localStorage local
           localStorage.removeItem(`modalidad_${student.id}`);
 
-          showToast(`Proceso y modalidad de ${student.nombre_completo} reiniciados con éxito.`, 'success');
+          showToast(`Proceso y modalidad de ${formattedName} reiniciados con éxito.`, 'success');
           await fetchAdminData(false);
         } catch (err) {
           showToast("Error al reiniciar estudiante: " + err.message, 'error');
@@ -523,7 +525,7 @@ export default function AdminDashboard() {
 
       return {
         id: st.id,
-        nombre: st.nombre_completo || 'Sin Nombre',
+        nombre: formatNombre(st.nombre_completo) || 'Sin Nombre',
         correo: st.correo || '',
         curso: st.curso_actual || '—',
         nivel_destino: targetNivel,
@@ -561,7 +563,7 @@ export default function AdminDashboard() {
       const st = students.find(s => s.id === row.alumno_id) || {};
       const modLabel = row.modalidad === 'cientifico_humanista' ? 'Científico Humanista' : 'Técnico Profesional (Gastronomía)';
       const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
-      csvContent += `"${st.nombre_completo || 'Desconocido'}","${st.rut || '—'}","${st.correo || '—'}","${st.curso_actual || '—'}","${modLabel}","${dateStr}"\n`;
+      csvContent += `"${formatNombre(st.nombre_completo) || 'Desconocido'}","${st.rut || '—'}","${st.correo || '—'}","${st.curso_actual || '—'}","${modLabel}","${dateStr}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1618,7 +1620,7 @@ export default function AdminDashboard() {
                           return (
                             <tr key={st.id}>
                               <td>
-                                <strong>{st.nombre_completo}</strong>
+                                <strong>{formatNombre(st.nombre_completo)}</strong>
                                 <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>RUT: {st.rut || 'No registrado'}</span>
                               </td>
                               <td>{st.correo}</td>

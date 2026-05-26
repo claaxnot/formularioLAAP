@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, GraduationCap, ShieldAlert, Award } from 'lucide-react';
+import { formatNombre } from '../utils/formatters';
 
 export default function Navbar() {
   const { role, profile, logout } = useAuth();
@@ -21,7 +22,7 @@ export default function Navbar() {
         {profile && (
           <div className="laap-navbar-user">
             <div className="laap-user-info">
-              <span className="laap-user-name">{profile.nombre_completo || profile.nombre || 'Usuario'}</span>
+              <span className="laap-user-name">{formatNombre(profile.nombre_completo || profile.nombre || 'Usuario')}</span>
               <span className="laap-user-detail">
                 {role === 'admin' ? (
                   <span className="role-badge admin">
