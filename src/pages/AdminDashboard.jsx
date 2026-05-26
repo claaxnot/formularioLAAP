@@ -280,12 +280,17 @@ export default function AdminDashboard() {
     if (!newElectiveId || !editingPostulacion) return;
     setSavingPostulacion(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('postulaciones')
         .update({ electivo_id: newElectiveId })
-        .eq('id', editingPostulacion.id);
+        .eq('id', editingPostulacion.id)
+        .select();
 
       if (error) throw error;
+
+      if (!data || data.length === 0) {
+        throw new Error("No tienes permisos suficientes en Supabase (Políticas RLS) para actualizar esta postulación. Por favor ejecuta el script de políticas de actualización (UPDATE) en tu editor de SQL en Supabase.");
+      }
 
       showToast("Asignación de electivo actualizada con éxito.", 'success');
       setEditingPostulacion(null);
@@ -1071,8 +1076,7 @@ export default function AdminDashboard() {
                             <tr key={el.id}>
                               <td>
                                 <strong>{el.nombre}</strong>
-                                <span style={{ fontSize: '10px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>ID: {el.id}</span>
-                                <small style={{ color: 'var(--text-secondary)' }}>{el.descripcion?.substring(0, 70)}...</small>
+                                <small style={{ color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>{el.descripcion?.substring(0, 70)}...</small>
                               </td>
                               <td>{el.docente || 'Docente UTP'}</td>
                               <td>{getScheduleName(el.horario_id)}</td>
@@ -1151,8 +1155,7 @@ export default function AdminDashboard() {
                             <tr key={el.id}>
                               <td>
                                 <strong>{el.nombre}</strong>
-                                <span style={{ fontSize: '10px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>ID: {el.id}</span>
-                                <small style={{ color: 'var(--text-secondary)' }}>{el.descripcion?.substring(0, 70)}...</small>
+                                <small style={{ color: 'var(--text-secondary)', display: 'block', marginTop: '4px' }}>{el.descripcion?.substring(0, 70)}...</small>
                               </td>
                               <td>{el.docente || 'Docente UTP'}</td>
                               <td>{getScheduleName(el.horario_id)}</td>
