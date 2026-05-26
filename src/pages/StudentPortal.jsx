@@ -574,32 +574,60 @@ export default function StudentPortal() {
             {/* ADVERTENCIA DE CONFIRMACIÓN */}
             {pendingModalidad && (
               <div className="laap-modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-                <div className="laap-modal-card animate-scaleIn" style={{ maxWidth: '500px', padding: '24px' }}>
-                  <h3 style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px 0' }}>
+                <div className="laap-modal-card animate-scaleIn" style={{
+                  maxWidth: '500px',
+                  width: '100%',
+                  backgroundColor: 'var(--bg-card, #1f2937)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: '16px',
+                  padding: '32px',
+                  boxShadow: '0 25px 50px -12px rgba(0,0,0,0.6)'
+                }}>
+                  <h3 style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 16px 0', fontSize: '18px', fontWeight: 'bold' }}>
                     <AlertTriangle size={24} />
                     Confirmar Especialidad TP
                   </h3>
-                  <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#ffffff' }}>
-                    ¿Estás seguro de que deseas inscribirte en la especialidad de **Técnico Profesional en Gastronomía**?
+                  <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#e5e7eb', margin: '0 0 16px 0' }}>
+                    ¿Estás seguro de que deseas inscribirte en la especialidad de <strong>Técnico Profesional en Gastronomía</strong>?
                   </p>
-                  <p style={{ fontSize: '13px', padding: '12px', borderRadius: '6px', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24', margin: '16px 0' }}>
+                  <p style={{ fontSize: '13px', padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24', margin: '0 0 24px 0', lineHeight: '1.5' }}>
                     <strong>⚠️ Esta elección finalizará tu proceso de electivos.</strong> No podrás escoger asignaturas comunes una vez confirmada esta opción.
                   </p>
-                  <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
                     <button 
                       type="button" 
-                      className="laap-btn-text" 
                       onClick={() => setPendingModalidad(null)}
                       disabled={savingModalidad}
+                      style={{
+                        padding: '10px 18px',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: '8px',
+                        backgroundColor: 'transparent',
+                        color: '#9ca3af',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        fontSize: '13px',
+                        transition: 'all 0.2s'
+                      }}
                     >
                       Cancelar
                     </button>
                     <button 
                       type="button" 
-                      className="laap-btn-primary" 
                       onClick={() => handleSelectModalidad('tecnico_profesional_gastronomia')}
                       disabled={savingModalidad}
-                      style={{ backgroundColor: '#ef4444' }}
+                      style={{
+                        padding: '10px 18px',
+                        border: 'none',
+                        borderRadius: '8px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        transition: 'all 0.2s',
+                        boxShadow: '0 4px 6px -1px rgba(239, 68, 68, 0.4)'
+                      }}
                     >
                       {savingModalidad ? 'Guardando...' : 'Confirmar Selección TP'}
                     </button>
@@ -622,21 +650,31 @@ export default function StudentPortal() {
             maxWidth: '650px',
             width: '100%',
             backgroundColor: 'var(--bg-card, #1f2937)',
-            border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
             borderRadius: '16px',
             padding: '40px',
             textAlign: 'center',
-            boxShadow: 'var(--shadow-lg, 0 10px 25px rgba(0,0,0,0.3))'
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
+            color: '#ffffff'
           }}>
             <Lock className="notice-icon" size={56} style={{ color: '#10b981', marginBottom: '20px' }} />
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 12px 0' }}>Matrícula de Especialidad Registrada</h2>
-            <p className="notice-msg" style={{ fontSize: '15px', color: '#d1d5db', margin: '0 0 24px 0', lineHeight: '1.6' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 16px 0', color: '#ffffff' }}>Matrícula de Especialidad Registrada</h2>
+            <p style={{
+              fontSize: '15px',
+              color: '#d1d5db',
+              margin: '0 0 24px 0',
+              lineHeight: '1.6',
+              padding: '16px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)'
+            }}>
               Tu postulación ha concluido con éxito. Has seleccionado la modalidad técnica y tu portal se encuentra bloqueado de forma definitiva.
             </p>
 
             <div style={{
-              backgroundColor: 'rgba(16, 185, 129, 0.05)',
-              border: '2px solid rgba(16, 185, 129, 0.3)',
+              backgroundColor: 'rgba(16, 185, 129, 0.04)',
+              border: '2px solid rgba(16, 185, 129, 0.25)',
               borderRadius: '12px',
               padding: '24px',
               textAlign: 'left',
@@ -645,13 +683,34 @@ export default function StudentPortal() {
               <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#34d399', margin: '0 0 16px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' }}>
                 Resumen del Registro Académico
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
-                <div><strong>Estudiante:</strong> {profile?.nombre_completo}</div>
-                <div><strong>RUT:</strong> {profile?.rut || 'No registrado'}</div>
-                <div><strong>Correo:</strong> {profile?.correo}</div>
-                <div><strong>Curso de Origen:</strong> {profile?.curso_actual || '3° Medio'}</div>
-                <div><strong>Modalidad Declarada:</strong> Técnico Profesional (Gastronomía)</div>
-                <div><strong>Estado de Toma Electiva:</strong> Finalizado y Bloqueado</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '14px', color: '#e5e7eb' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
+                  <span style={{ color: '#9ca3af' }}>Estudiante:</span>
+                  <span style={{ fontWeight: '600' }}>{profile?.nombre_completo}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
+                  <span style={{ color: '#9ca3af' }}>RUT:</span>
+                  <span style={{ fontWeight: '600' }}>{profile?.rut || 'No registrado'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
+                  <span style={{ color: '#9ca3af' }}>Correo:</span>
+                  <span style={{ fontWeight: '600' }}>{profile?.correo}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
+                  <span style={{ color: '#9ca3af' }}>Curso de Origen:</span>
+                  <span style={{ fontWeight: '600' }}>{profile?.curso_actual || '3° Medio'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
+                  <span style={{ color: '#9ca3af' }}>Modalidad Declarada:</span>
+                  <span style={{ fontWeight: '600', color: '#34d399' }}>Técnico Profesional (Gastronomía)</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '4px' }}>
+                  <span style={{ color: '#9ca3af' }}>Estado de Toma Electiva:</span>
+                  <span style={{ fontWeight: '600', color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }}></span>
+                    Finalizado y Bloqueado
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -752,20 +811,62 @@ export default function StudentPortal() {
 
         {/* Caso en que no haya electivos cargados */}
         {electives.length === 0 ? (
-          <div className="portal-submitted-notice animate-scaleIn" style={{ padding: '40px', textAlign: 'center' }}>
-            <AlertTriangle className="notice-icon text-amber-500" size={48} style={{ marginBottom: '16px' }} />
-            <h2>Proceso No Iniciado</h2>
-            <p className="notice-msg" style={{ fontSize: '15px', color: '#9ca3af' }}>
-              No hay electivos disponibles para este proceso.
+          <div className="portal-submitted-notice animate-scaleIn" style={{
+            maxWidth: '650px',
+            width: '100%',
+            margin: '0 auto',
+            backgroundColor: 'var(--bg-card, #1f2937)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '16px',
+            padding: '40px',
+            textAlign: 'center',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
+            color: '#ffffff'
+          }}>
+            <AlertTriangle size={56} style={{ color: '#fbbf24', marginBottom: '20px' }} />
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 16px 0', color: '#ffffff' }}>Proceso No Iniciado</h2>
+            <p style={{
+              fontSize: '15px',
+              color: '#d1d5db',
+              margin: '0 auto',
+              lineHeight: '1.6',
+              padding: '16px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              maxWidth: '500px'
+            }}>
+              No hay electivos disponibles para este proceso en este momento.
             </p>
           </div>
         ) : alreadySubmitted ? (
           /* Mensaje de ya postulado */
-          <div className="portal-submitted-notice animate-scaleIn">
-            <Lock className="notice-icon" size={48} />
-            <h2>Formulario Bloqueado</h2>
-            <p className="notice-msg">
-              “Ya registraste tu selección de electivos. Si necesitas hacer un cambio, debes contactar a UTP.”
+          <div className="portal-submitted-notice animate-scaleIn" style={{
+            maxWidth: '850px',
+            width: '100%',
+            margin: '0 auto',
+            backgroundColor: 'var(--bg-card, #1f2937)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: '16px',
+            padding: '40px',
+            textAlign: 'center',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.4)',
+            color: '#ffffff'
+          }}>
+            <Lock className="notice-icon" size={56} style={{ color: '#10b981', marginBottom: '20px' }} />
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 16px 0', color: '#ffffff' }}>Formulario Bloqueado</h2>
+            <p style={{
+              fontSize: '15px',
+              color: '#d1d5db',
+              margin: '0 auto 24px auto',
+              lineHeight: '1.6',
+              padding: '16px',
+              borderRadius: '8px',
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              maxWidth: '600px'
+            }}>
+              Ya registraste tu selección de electivos de forma exitosa. Si necesitas hacer un cambio, debes contactar a UTP.
             </p>
 
             <div className="selections-display">
