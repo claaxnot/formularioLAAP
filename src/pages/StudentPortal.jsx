@@ -11,7 +11,8 @@ import {
   Bookmark,
   Lock,
   ListOrdered,
-  ChevronDown
+  ChevronDown,
+  GraduationCap
 } from 'lucide-react';
 
 const getStudentNivelDestino = (curso) => {
@@ -49,6 +50,9 @@ export default function StudentPortal() {
   const [successMsg, setSuccessMsg] = useState('');
   const [isProcessOpen, setIsProcessOpen] = useState(true); // Control administrativo de apertura/cierre
   const [lastUpdated, setLastUpdated] = useState('');
+  const [modalidad, setModalidad] = useState(null);
+  const [savingModalidad, setSavingModalidad] = useState(false);
+  const [pendingModalidad, setPendingModalidad] = useState(null);
 
   // Cargar datos al montar o al cambiar de perfil
   useEffect(() => {
@@ -126,6 +130,33 @@ export default function StudentPortal() {
       // Si no hay proceso activo o activo = false, bloquear formulario
       const open = procData && procData.length > 0;
       setIsProcessOpen(open);
+
+      // 0.5. Consultar modalidad del alumno en Supabase
+      let currentModalidad = null;
+      try {
+        const { data: modData, error: modErr } = await supabase
+          .from('elecciones_modalidad')
+          .select('*')
+          .eq('alumno_id', profile.id)
+          .maybeSingle();
+
+        if (!modErr && modData) {
+          currentModalidad = modData.modalidad;
+        } else if (modErr && modErr.code !== 'PGRST116') {
+          console.error("Error al consultar modalidad en Supabase:", modErr);
+        }
+      } catch (err) {
+        console.error("Excepción al consultar modalidad:", err);
+      }
+
+      // Si no hay modalidad en la DB, buscar en localStorage
+      if (!currentModalidad) {
+        const cached = localStorage.getItem(`modalidad_${profile.id}`);
+        if (cached) {
+          currentModalidad = cached;
+        }
+      }
+      setModalidad(currentModalidad);
 
       // 1. Verificar si hay postulaciones reales del alumno en Supabase
       const { data: postData, error: postErr } = await supabase
@@ -370,6 +401,35 @@ export default function StudentPortal() {
     );
   };
 
+  const handleSelectModalidad = async (selectedMod) => {
+    setSavingModalidad(true);
+    try {
+      // Intentar guardar en Supabase
+      const { error } = await supabase
+        .from('elecciones_modalidad')
+        .insert([{
+          alumno_id: profile.id,
+          modalidad: selectedMod
+        }]);
+
+      if (error) {
+        console.warn("No se pudo insertar en la tabla elecciones_modalidad (puede no existir aún). Se guardará en fallback local:", error);
+      }
+      
+      // Siempre persistir en localStorage para fallback/offline robustness
+      localStorage.setItem(`modalidad_${profile.id}`, selectedMod);
+      
+      setModalidad(selectedMod);
+      showToast("Modalidad guardada exitosamente.", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Error al guardar modalidad: " + err.message, "error");
+    } finally {
+      setSavingModalidad(false);
+      setPendingModalidad(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="laap-loading-container">
@@ -404,6 +464,202 @@ export default function StudentPortal() {
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!modalidad) {
+    return (
+      <div className="laap-student-portal" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Navbar />
+        <main className="student-portal-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '24px' }}>
+          <div className="animate-scaleIn" style={{
+            maxWidth: '800px',
+            width: '100%',
+            backgroundColor: 'var(--bg-card, #1f2937)',
+            border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+            borderRadius: '16px',
+            padding: '32px',
+            boxShadow: 'var(--shadow-lg, 0 10px 25px rgba(0,0,0,0.3))'
+          }}>
+            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+              <GraduationCap size={48} style={{ color: '#3b82f6', marginBottom: '12px' }} />
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0', color: 'var(--text-primary, #ffffff)' }}>
+                Selección de Modalidad Académica
+              </h2>
+              <p style={{ color: 'var(--text-secondary, #9ca3af)', fontSize: '14px', margin: 0 }}>
+                Estimado/a <strong>{profile?.nombre_completo}</strong> (RUT: {profile?.rut || 'No registrado'}), debes declarar tu modalidad educativa para continuar.
+              </p>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '24px',
+              marginBottom: '32px'
+            }}>
+              {/* VÍA 1: CIENTÍFICO HUMANISTA */}
+              <div className="modality-card" style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                padding: '24px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(59, 130, 246, 0.04)',
+                border: '2px solid rgba(59, 130, 246, 0.2)',
+                transition: 'all 0.3s ease'
+              }}>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px 0' }}>
+                    <BookOpen size={20} />
+                    Científico Humanista
+                  </h3>
+                  <p style={{ fontSize: '13px', color: '#d1d5db', lineHeight: '1.6', margin: '0 0 16px 0' }}>
+                    Esta modalidad te permite continuar con el proceso regular de postulación a asignaturas electivas según tus intereses académicos y horarios.
+                  </p>
+                  <ul style={{ paddingLeft: '20px', fontSize: '12px', color: '#9ca3af', margin: '0 0 20px 0', lineHeight: '1.6' }}>
+                    <li>Elección de asignaturas por bloque de horario.</li>
+                    <li>Preparación integral para la educación superior.</li>
+                    <li>Acceso al catálogo regular de electivos LAAP.</li>
+                  </ul>
+                </div>
+                <button
+                  type="button"
+                  className="laap-btn-primary"
+                  onClick={() => handleSelectModalidad('cientifico_humanista')}
+                  style={{ width: '100%', marginTop: 'auto', backgroundColor: '#2563eb' }}
+                  disabled={savingModalidad}
+                >
+                  {savingModalidad ? 'Guardando...' : 'Continuar a Selección de Electivos'}
+                </button>
+              </div>
+
+              {/* VÍA 2: TÉCNICO PROFESIONAL */}
+              <div className="modality-card" style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                padding: '24px',
+                borderRadius: '12px',
+                backgroundColor: 'rgba(16, 185, 129, 0.04)',
+                border: '2px solid rgba(16, 185, 129, 0.2)',
+                transition: 'all 0.3s ease'
+              }}>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#34d399', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px 0' }}>
+                    <GraduationCap size={20} />
+                    Técnico Profesional
+                  </h3>
+                  <p style={{ fontSize: '13px', color: '#d1d5db', lineHeight: '1.6', margin: '0 0 16px 0' }}>
+                    Especialidad técnica de excelencia enfocada en gastronomía y servicios culinarios. Al seleccionar esta modalidad finalizas tu proceso de postulación de electivos comunes de inmediato.
+                  </p>
+                  <ul style={{ paddingLeft: '20px', fontSize: '12px', color: '#9ca3af', margin: '0 0 20px 0', lineHeight: '1.6' }}>
+                    <li>Clases teórico-prácticas en talleres de cocina.</li>
+                    <li>Práctica profesional integrada y titulación.</li>
+                    <li>Proceso de electivos comunes cerrado automáticamente.</li>
+                  </ul>
+                </div>
+                <button
+                  type="button"
+                  className="laap-btn-success"
+                  onClick={() => setPendingModalidad('tecnico_profesional_gastronomia')}
+                  style={{ width: '100%', marginTop: 'auto', backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                  disabled={savingModalidad}
+                >
+                  Declarar Especialidad TP
+                </button>
+              </div>
+            </div>
+
+            {/* ADVERTENCIA DE CONFIRMACIÓN */}
+            {pendingModalidad && (
+              <div className="laap-modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                <div className="laap-modal-card animate-scaleIn" style={{ maxWidth: '500px', padding: '24px' }}>
+                  <h3 style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 12px 0' }}>
+                    <AlertTriangle size={24} />
+                    Confirmar Especialidad TP
+                  </h3>
+                  <p style={{ fontSize: '14px', lineHeight: '1.6', color: '#ffffff' }}>
+                    ¿Estás seguro de que deseas inscribirte en la especialidad de **Técnico Profesional en Gastronomía**?
+                  </p>
+                  <p style={{ fontSize: '13px', padding: '12px', borderRadius: '6px', backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24', margin: '16px 0' }}>
+                    <strong>⚠️ Esta elección finalizará tu proceso de electivos.</strong> No podrás escoger asignaturas comunes una vez confirmada esta opción.
+                  </p>
+                  <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                    <button 
+                      type="button" 
+                      className="laap-btn-text" 
+                      onClick={() => setPendingModalidad(null)}
+                      disabled={savingModalidad}
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="button" 
+                      className="laap-btn-primary" 
+                      onClick={() => handleSelectModalidad('tecnico_profesional_gastronomia')}
+                      disabled={savingModalidad}
+                      style={{ backgroundColor: '#ef4444' }}
+                    >
+                      {savingModalidad ? 'Guardando...' : 'Confirmar Selección TP'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (modalidad === 'tecnico_profesional_gastronomia') {
+    return (
+      <div className="laap-student-portal" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Navbar />
+        <main className="student-portal-main" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, padding: '24px' }}>
+          <div className="portal-submitted-notice animate-scaleIn" style={{
+            maxWidth: '650px',
+            width: '100%',
+            backgroundColor: 'var(--bg-card, #1f2937)',
+            border: '1px solid var(--border-color, rgba(255,255,255,0.08))',
+            borderRadius: '16px',
+            padding: '40px',
+            textAlign: 'center',
+            boxShadow: 'var(--shadow-lg, 0 10px 25px rgba(0,0,0,0.3))'
+          }}>
+            <Lock className="notice-icon" size={56} style={{ color: '#10b981', marginBottom: '20px' }} />
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 12px 0' }}>Matrícula de Especialidad Registrada</h2>
+            <p className="notice-msg" style={{ fontSize: '15px', color: '#d1d5db', margin: '0 0 24px 0', lineHeight: '1.6' }}>
+              Tu postulación ha concluido con éxito. Has seleccionado la modalidad técnica y tu portal se encuentra bloqueado de forma definitiva.
+            </p>
+
+            <div style={{
+              backgroundColor: 'rgba(16, 185, 129, 0.05)',
+              border: '2px solid rgba(16, 185, 129, 0.3)',
+              borderRadius: '12px',
+              padding: '24px',
+              textAlign: 'left',
+              marginBottom: '24px'
+            }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#34d399', margin: '0 0 16px 0', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' }}>
+                Resumen del Registro Académico
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+                <div><strong>Estudiante:</strong> {profile?.nombre_completo}</div>
+                <div><strong>RUT:</strong> {profile?.rut || 'No registrado'}</div>
+                <div><strong>Correo:</strong> {profile?.correo}</div>
+                <div><strong>Curso de Origen:</strong> {profile?.curso_actual || '3° Medio'}</div>
+                <div><strong>Modalidad Declarada:</strong> Técnico Profesional (Gastronomía)</div>
+                <div><strong>Estado de Toma Electiva:</strong> Finalizado y Bloqueado</div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '12px', color: '#9ca3af', margin: 0 }}>
+              Si requieres realizar modificaciones o crees que hubo un error, por favor ponte en contacto directo con la Unidad Técnico Pedagógica (UTP).
+            </p>
+          </div>
+        </main>
       </div>
     );
   }

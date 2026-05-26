@@ -14,7 +14,8 @@ import {
   CheckCircle, 
   Clock, 
   ListOrdered,
-  AlertTriangle
+  AlertTriangle,
+  GraduationCap
 } from 'lucide-react';
 
 const getStudentNivelDestino = (curso) => {
@@ -32,6 +33,7 @@ const getStudentNivelDestino = (curso) => {
 export default function AdminDashboard() {
   const { profile, showToast, showConfirm } = useAuth();
   const [activeTab, setActiveTab] = useState('stats'); // 'stats', 'postulaciones', 'lista_espera', 'electivos_3m', 'electivos_4m', 'alumnos'
+  const [eleccionesModalidad, setEleccionesModalidad] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -154,6 +156,38 @@ export default function AdminDashboard() {
       setWaitlist(wlData || []);
       setHorarios(horData || []);
       setAreas(areaData || []);
+
+      // 9. Cargar elecciones_modalidad real (o fallback local)
+      let modData = [];
+      try {
+        const { data, error } = await supabase
+          .from('elecciones_modalidad')
+          .select('*');
+        if (!error && data) {
+          modData = data;
+        } else if (error && error.code !== 'PGRST116') {
+          console.warn("Fallo query a elecciones_modalidad, se usará fallback local:", error);
+        }
+      } catch (err) {
+        console.warn("Excepción al consultar elecciones_modalidad, usando fallback:", err);
+      }
+
+      if (modData.length === 0) {
+        // Fallback local: recuperar del localStorage para los estudiantes cargados
+        const fallbackList = [];
+        (stdData || []).forEach(st => {
+          const cached = localStorage.getItem(`modalidad_${st.id}`);
+          if (cached) {
+            fallbackList.push({
+              alumno_id: st.id,
+              modalidad: cached,
+              created_at: new Date().toISOString()
+            });
+          }
+        });
+        modData = fallbackList;
+      }
+      setEleccionesModalidad(modData);
 
       // Registrar hora exacta de última actualización
       const now = new Date();
@@ -487,6 +521,29 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
+  // Exportar modalidades a CSV
+  const handleExportModalidadesCSV = () => {
+    let csvContent = "\uFEFF"; // UTF-8 BOM
+    csvContent += "Nombre Estudiante,RUT,Correo,Curso Actual,Modalidad Seleccionada,Fecha Registro\n";
+    
+    eleccionesModalidad.forEach(row => {
+      const st = students.find(s => s.id === row.alumno_id) || {};
+      const modLabel = row.modalidad === 'cientifico_humanista' ? 'Científico Humanista' : 'Técnico Profesional (Gastronomía)';
+      const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+      csvContent += `"${st.nombre_completo || 'Desconocido'}","${st.rut || '—'}","${st.correo || '—'}","${st.curso_actual || '—'}","${modLabel}","${dateStr}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Reporte_Modalidades_Alessandri_Palma_2026.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // UI Helper for Refresh Indicator
   const getUpdateIndicator = () => {
     return (
@@ -760,6 +817,13 @@ export default function AdminDashboard() {
           >
             <Users size={16} />
             <span>Roster Alumnos ({students.length})</span>
+          </button>
+          <button 
+            className={`admin-tab-btn ${activeTab === 'modalidades_tp' ? 'active' : ''}`}
+            onClick={() => setActiveTab('modalidades_tp')}
+          >
+            <GraduationCap size={16} />
+            <span>Modalidades TP ({eleccionesModalidad.filter(m => m.modalidad === 'tecnico_profesional_gastronomia').length})</span>
           </button>
         </div>
 
@@ -1355,6 +1419,132 @@ export default function AdminDashboard() {
                                   <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>—</span>
                                 )}
                               </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {activeTab === 'modalidades_tp' && (() => {
+          // KPIs
+          const totalCH = eleccionesModalidad.filter(m => m.modalidad === 'cientifico_humanista').length;
+          const totalTP = eleccionesModalidad.filter(m => m.modalidad === 'tecnico_profesional_gastronomia').length;
+
+          return (
+            <div className="animate-fadeIn">
+              {/* KPIs de Modalidad */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '20px',
+                marginBottom: '24px'
+              }}>
+                <div style={{
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  boxShadow: 'var(--shadow-subtle)'
+                }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>
+                    Científico Humanista
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6', marginTop: '8px' }}>
+                    {totalCH} <span style={{ fontSize: '14px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>estudiantes</span>
+                  </div>
+                </div>
+
+                <div style={{
+                  backgroundColor: 'var(--bg-card)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  boxShadow: 'var(--shadow-subtle)'
+                }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 'bold' }}>
+                    TP Gastronomía
+                  </div>
+                  <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981', marginTop: '8px' }}>
+                    {totalTP} <span style={{ fontSize: '14px', fontWeight: 'normal', color: 'var(--text-secondary)' }}>estudiantes</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contenedor de la Tabla */}
+              <div style={{
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '24px',
+                boxShadow: 'var(--shadow-subtle)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                    Listado de Estudiantes por Modalidad
+                  </h3>
+                  <button className="laap-btn-success" onClick={handleExportModalidadesCSV} style={{ margin: 0 }}>
+                    <FileSpreadsheet size={16} style={{ marginRight: '8px' }} />
+                    <span>Exportar Modalidades (CSV)</span>
+                  </button>
+                </div>
+
+                <div className="table-responsive">
+                  <table className="laap-table">
+                    <thead>
+                      <tr>
+                        <th>Alumno</th>
+                        <th>Curso</th>
+                        <th>Correo</th>
+                        <th>Modalidad</th>
+                        <th>Fecha de Selección</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {eleccionesModalidad.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
+                            No hay registros de modalidad registrados aún.
+                          </td>
+                        </tr>
+                      ) : (
+                        eleccionesModalidad.map((row, idx) => {
+                          const st = students.find(s => s.id === row.alumno_id) || {};
+                          const isTP = row.modalidad === 'tecnico_profesional_gastronomia';
+                          const modLabel = isTP ? 'Técnico Profesional (Gastronomía)' : 'Científico Humanista';
+                          const badgeColor = isTP ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)';
+                          const badgeText = isTP ? '#10b981' : '#3b82f6';
+                          const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+                          return (
+                            <tr key={row.id || idx}>
+                              <td>
+                                <strong>{st.nombre_completo || 'Desconocido'}</strong>
+                                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+                                  RUT: {st.rut || '—'}
+                                </span>
+                              </td>
+                              <td>{st.curso_actual || '—'}</td>
+                              <td>{st.correo || '—'}</td>
+                              <td>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  padding: '4px 8px',
+                                  borderRadius: '20px',
+                                  fontSize: '11px',
+                                  fontWeight: 'bold',
+                                  backgroundColor: badgeColor,
+                                  color: badgeText
+                                }}>
+                                  {modLabel}
+                                </span>
+                              </td>
+                              <td>{dateStr}</td>
                             </tr>
                           );
                         })
