@@ -563,14 +563,14 @@ export default function StudentPortal() {
                   type="button"
                   className="laap-btn-success"
                   onClick={() => setPendingModalidad('tecnico_profesional_gastronomia')}
-                  style={{ width: '100%', marginTop: 'auto', backgroundColor: '#10b981', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                  style={{ width: '100%', marginTop: 'auto', backgroundColor: '#10b981' }}
                   disabled={savingModalidad}
                 >
-                  Declarar Especialidad TP
+                  {savingModalidad ? 'Guardando...' : 'Declarar Especialidad TP'}
                 </button>
               </div>
             </div>
-
+ 
             {/* ADVERTENCIA DE CONFIRMACIÓN */}
             {pendingModalidad && (
               <div className="laap-modal-backdrop" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -593,7 +593,7 @@ export default function StudentPortal() {
                   <p style={{ fontSize: '13px', padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', color: '#fbbf24', margin: '0 0 24px 0', lineHeight: '1.5' }}>
                     <strong>⚠️ Esta elección finalizará tu proceso de electivos.</strong> No podrás escoger asignaturas comunes una vez confirmada esta opción.
                   </p>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', alignItems: 'center' }}>
                     <button 
                       type="button" 
                       onClick={() => setPendingModalidad(null)}
@@ -618,7 +618,7 @@ export default function StudentPortal() {
                       disabled={savingModalidad}
                       style={{
                         padding: '10px 18px',
-                        border: 'none',
+                        border: '1px solid transparent',
                         borderRadius: '8px',
                         backgroundColor: '#ef4444',
                         color: 'white',
