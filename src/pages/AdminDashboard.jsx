@@ -320,17 +320,16 @@ export default function AdminDashboard() {
     );
   };
 
-  // Eliminar Postulación (Admin Override real)
+  // Eliminar Postulación (Admin Override real - libera todos los cupos del alumno para permitirle postular de nuevo)
   const handleDeletePostulacion = async (postItem) => {
     const studentName = getAlumnoName(postItem.alumno_id);
-    const electiveName = getElectiveName(postItem.electivo_id);
     showConfirm(
-      `¿Liberar la postulación del alumno ${studentName} para ${electiveName}?`,
+      `¿Liberar completamente la selección de electivos del alumno ${studentName}? Esto eliminará sus 3 asignaturas asignadas y le permitirá volver a realizar su postulación en el portal.`,
       async () => {
         try {
-          const { error } = await supabase.from('postulaciones').delete().eq('id', postItem.id);
+          const { error } = await supabase.from('postulaciones').delete().eq('alumno_id', postItem.alumno_id);
           if (error) throw error;
-          showToast("Postulación liberada correctamente.", 'success');
+          showToast(`Selección de ${studentName} liberada y reiniciada correctamente.`, 'success');
           await fetchAdminData(false);
         } catch (err) {
           showToast("Error al liberar postulación: " + err.message, 'error');
@@ -338,6 +337,24 @@ export default function AdminDashboard() {
       }
     );
   };
+
+  // Reiniciar selección desde el Roster General de alumnos
+  const handleResetStudentSelections = async (student) => {
+    showConfirm(
+      `¿Seguro que deseas reiniciar completamente la selección de electivos de ${student.nombre_completo}? Esto eliminará sus 3 postulaciones actuales para que pueda postular de nuevo.`,
+      async () => {
+        try {
+          const { error } = await supabase.from('postulaciones').delete().eq('alumno_id', student.id);
+          if (error) throw error;
+          showToast(`Selección de ${student.nombre_completo} reiniciada con éxito.`, 'success');
+          await fetchAdminData(false);
+        } catch (err) {
+          showToast("Error al reiniciar selección: " + err.message, 'error');
+        }
+      }
+    );
+  };
+
 
   // Abrir Modal para crear
   const openCreateModal = (defaultNivel = '3M') => {
@@ -1128,12 +1145,13 @@ export default function AdminDashboard() {
                       <th>Horario 1</th>
                       <th>Horario 2</th>
                       <th>Horario 3</th>
+                      <th>Acción</th>
                     </tr>
                   </thead>
                   <tbody>
                     {students.length === 0 ? (
                       <tr>
-                        <td colSpan="7" style={{ textAlign: 'center', padding: '24px' }}>No hay registros disponibles.</td>
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '24px' }}>No hay registros disponibles.</td>
                       </tr>
                     ) : (
                       students.map(st => {
@@ -1164,6 +1182,21 @@ export default function AdminDashboard() {
                             <td><small>{h1}</small></td>
                             <td><small>{h2}</small></td>
                             <td><small>{h3}</small></td>
+                            <td>
+                              {hasSubmitted ? (
+                                <button 
+                                  className="btn-table-danger"
+                                  onClick={() => handleResetStudentSelections(st)}
+                                  title="Reiniciar y liberar selección del alumno"
+                                  style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0 }}
+                                >
+                                  <Trash2 size={12} />
+                                  <span>Reiniciar</span>
+                                </button>
+                              ) : (
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>—</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })
