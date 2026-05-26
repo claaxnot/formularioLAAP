@@ -52,6 +52,11 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [rosterSearchQuery, setRosterSearchQuery] = useState('');
   const [rosterCursoFilter, setRosterCursoFilter] = useState('all');
+
+  // Edit Student Postulacion States
+  const [editingPostulacion, setEditingPostulacion] = useState(null);
+  const [newElectiveId, setNewElectiveId] = useState('');
+  const [savingPostulacion, setSavingPostulacion] = useState(false);
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('create'); // 'create' or 'edit'
@@ -256,6 +261,40 @@ export default function AdminDashboard() {
   const getAlumnoCurso = (alumnoId) => {
     const student = students.find(s => s.id === alumnoId);
     return student ? student.curso_actual : '—';
+  };
+
+  const getAlumnoRut = (alumnoId) => {
+    const student = students.find(s => s.id === alumnoId);
+    return student ? student.rut : '—';
+  };
+
+  // Abrir Modal para editar una asignación de electivo individual
+  const handleOpenEditPostulacionModal = (postItem) => {
+    setEditingPostulacion(postItem);
+    setNewElectiveId(postItem.electivo_id);
+  };
+
+  // Guardar la edición de una asignación de electivo en Supabase
+  const handleSavePostulacionEdit = async (e) => {
+    e.preventDefault();
+    if (!newElectiveId || !editingPostulacion) return;
+    setSavingPostulacion(true);
+    try {
+      const { error } = await supabase
+        .from('postulaciones')
+        .update({ electivo_id: newElectiveId })
+        .eq('id', editingPostulacion.id);
+
+      if (error) throw error;
+
+      showToast("Asignación de electivo actualizada con éxito.", 'success');
+      setEditingPostulacion(null);
+      await fetchAdminData(false);
+    } catch (err) {
+      showToast("Error al actualizar la postulación: " + err.message, 'error');
+    } finally {
+      setSavingPostulacion(false);
+    }
   };
 
   const getElectiveName = (electiveId) => {
@@ -875,7 +914,11 @@ export default function AdminDashboard() {
                           const matchedElective = electives.find(e => e.id === p.electivo_id) || {};
                           return (
                             <tr key={p.id} style={{ backgroundColor: blockColor }}>
-                              <td><strong>{getAlumnoName(p.alumno_id)}</strong><br /><small>{getAlumnoEmail(p.alumno_id)}</small></td>
+                              <td>
+                                <strong>{getAlumnoName(p.alumno_id)}</strong><br />
+                                <small style={{ display: 'block', color: 'var(--text-secondary)' }}>{getAlumnoEmail(p.alumno_id)}</small>
+                                <small style={{ fontFamily: 'monospace', color: 'var(--text-secondary)', fontWeight: 'bold' }}>RUT: {getAlumnoRut(p.alumno_id)}</small>
+                              </td>
                               <td>{getAlumnoCurso(p.alumno_id)}</td>
                               <td>{getElectiveName(p.electivo_id)}</td>
                               <td>{getScheduleName(p.horario_id)}</td>
@@ -886,14 +929,26 @@ export default function AdminDashboard() {
                               </td>
                               <td>{new Date(p.created_at).toLocaleString('es-CL')}</td>
                               <td>
-                                <button 
-                                  className="btn-table-danger"
-                                  onClick={() => handleDeletePostulacion(p)}
-                                  title="Anular postulación (Baja Administrativa)"
-                                >
-                                  <Trash2 size={14} />
-                                  <span>Liberar</span>
-                                </button>
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button 
+                                    className="btn-table-edit"
+                                    onClick={() => handleOpenEditPostulacionModal(p)}
+                                    title="Modificar asignatura de esta postulación"
+                                    style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', height: '28px', margin: 0 }}
+                                  >
+                                    <Edit3 size={12} />
+                                    <span>Editar</span>
+                                  </button>
+                                  <button 
+                                    className="btn-table-danger"
+                                    onClick={() => handleDeletePostulacion(p)}
+                                    title="Liberar selección completa de este alumno"
+                                    style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', height: '28px', margin: 0 }}
+                                  >
+                                    <Trash2 size={12} />
+                                    <span>Liberar</span>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -935,7 +990,11 @@ export default function AdminDashboard() {
                         const matchedElective = electives.find(e => e.id === w.electivo_id) || {};
                         return (
                           <tr key={w.id}>
-                            <td><strong>{getAlumnoName(w.alumno_id)}</strong><br /><small>{getAlumnoEmail(w.alumno_id)}</small></td>
+                            <td>
+                              <strong>{getAlumnoName(w.alumno_id)}</strong><br />
+                              <small style={{ display: 'block', color: 'var(--text-secondary)' }}>{getAlumnoEmail(w.alumno_id)}</small>
+                              <small style={{ fontFamily: 'monospace', color: 'var(--text-secondary)', fontWeight: 'bold' }}>RUT: {getAlumnoRut(w.alumno_id)}</small>
+                            </td>
                             <td>{getAlumnoCurso(w.alumno_id)}</td>
                             <td><strong>{getElectiveName(w.electivo_id)}</strong></td>
                             <td>{getScheduleName(matchedElective.horario_id || 1)}</td>
@@ -1251,7 +1310,7 @@ export default function AdminDashboard() {
                             <tr key={st.id}>
                               <td>
                                 <strong>{st.nombre_completo}</strong>
-                                <span style={{ fontSize: '10px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>ID: {st.id}</span>
+                                <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>RUT: {st.rut || 'No registrado'}</span>
                               </td>
                               <td>{st.correo}</td>
                               <td>{st.curso_actual || '3° Medio'}</td>
@@ -1419,6 +1478,94 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
+
+        {/* MODAL EDITAR POSTULACIÓN DEL ALUMNO */}
+        {editingPostulacion && (() => {
+          const student = students.find(s => s.id === editingPostulacion.alumno_id) || {};
+          const nivelDestino = getStudentNivelDestino(student.curso_actual) || '3M';
+          const availableElectives = electives.filter(e => 
+            e.activo && 
+            String(e.horario_id) === String(editingPostulacion.horario_id) && 
+            e.nivel_destino === nivelDestino
+          );
+
+          return (
+            <div className="laap-modal-backdrop">
+              <div className="laap-modal-card animate-scaleIn">
+                <div className="modal-header">
+                  <h2>Modificar Electivo Asignado</h2>
+                  <button className="btn-modal-close" onClick={() => setEditingPostulacion(null)}>×</button>
+                </div>
+
+                <form onSubmit={handleSavePostulacionEdit} className="modal-form">
+                  <div style={{
+                    padding: '12px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    marginBottom: '16px',
+                    fontSize: '13px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    <div><strong>Estudiante:</strong> {student.nombre_completo}</div>
+                    <div><strong>RUT:</strong> {student.rut || 'No registrado'}</div>
+                    <div><strong>Curso Actual:</strong> {student.curso_actual || '3° Medio'}</div>
+                    <div><strong>Bloque Horario:</strong> {getScheduleName(editingPostulacion.horario_id)}</div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Seleccionar Nueva Asignatura para este Horario</label>
+                    <select
+                      value={newElectiveId}
+                      onChange={(e) => setNewElectiveId(e.target.value)}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        backgroundColor: 'rgba(0,0,0,0.2)',
+                        color: 'white',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="" disabled>Seleccione una opción...</option>
+                      {availableElectives.map(el => {
+                        const cupoDetail = cupos.find(c => c.electivo_id === el.id || c.id === el.id) || {};
+                        const vacantes = (el.cupos_maximos - (cupoDetail.cupos_ocupados || 0));
+                        return (
+                          <option key={el.id} value={el.id} style={{ backgroundColor: '#1f2937' }}>
+                            {el.nombre} (Vacantes: {vacantes > 0 ? vacantes : 'Sin cupo'})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+
+                  <div className="modal-actions" style={{ marginTop: '20px' }}>
+                    <button 
+                      type="button" 
+                      className="laap-btn-text" 
+                      onClick={() => setEditingPostulacion(null)}
+                      disabled={savingPostulacion}
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit" 
+                      className="laap-btn-primary"
+                      disabled={savingPostulacion || !newElectiveId}
+                    >
+                      {savingPostulacion ? 'Guardando...' : 'Confirmar Cambio'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
+        })()}
 
       </main>
     </div>
