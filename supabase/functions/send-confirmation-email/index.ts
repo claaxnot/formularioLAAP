@@ -12,7 +12,12 @@ serve(async (req) => {
   }
 
   try {
+    const body = await req.json()
+    console.log("=== INICIO SEND-CONFIRMATION-EMAIL ===")
+    console.log("Payload recibido:", JSON.stringify(body, null, 2))
+
     const { 
+      alumno_id,
       email,
       nombre_completo,
       rut,
@@ -22,15 +27,76 @@ serve(async (req) => {
       correo_apoderado_1,
       correo_apoderado_2,
       electivos
-    } = await req.json()
+    } = body
+
+    console.log("Alumno ID:", alumno_id || "No especificado")
+    console.log("Modalidad:", modalidad)
+
+    // 1. VALIDACIÓN: RESEND_API_KEY
+    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+    if (!RESEND_API_KEY) {
+      console.error("Error de Validación: Falta RESEND_API_KEY en secrets.");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "No se ha configurado la variable de entorno RESEND_API_KEY en Supabase.",
+        details: "RESEND_API_KEY is missing or undefined inside Supabase Secrets."
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      })
+    }
 
     // Consolidar destinatarios
-    const toEmails = [email]
+    const toEmails = []
+    if (email && email.trim() !== '') {
+      toEmails.push(email.trim())
+    }
     if (correo_apoderado_1 && correo_apoderado_1.trim() !== '') {
       toEmails.push(correo_apoderado_1.trim())
     }
     if (correo_apoderado_2 && correo_apoderado_2.trim() !== '') {
       toEmails.push(correo_apoderado_2.trim())
+    }
+
+    console.log("Destinatarios calculados:", toEmails)
+
+    // 2. VALIDACIÓN: Destinatarios válidos
+    if (toEmails.length === 0) {
+      console.error("Error de Validación: No hay destinatarios válidos");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "No se encontraron destinatarios válidos para el envío del correo.",
+        details: "The computed toEmails array is empty. Verify that the student has a valid email address."
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      })
+    }
+
+    // 3. VALIDACIÓN: El alumno existe (Nombre y RUT válidos)
+    if (!nombre_completo || !nombre_completo.trim() || !rut || !rut.trim()) {
+      console.error("Error de Validación: Alumno incompleto o inexistente");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "La información básica del estudiante (Nombre o RUT) está incompleta o es inválida.",
+        details: `nombre_completo: "${nombre_completo}", rut: "${rut}"`
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      })
+    }
+
+    // 4. VALIDACIÓN: Modalidad válida
+    if (modalidad !== 'cientifico_humanista' && modalidad !== 'tecnico_profesional_gastronomia') {
+      console.error("Error de Validación: Modalidad no soportada");
+      return new Response(JSON.stringify({
+        success: false,
+        error: "La modalidad académica especificada no es válida.",
+        details: `modalidad received: "${modalidad}". Must be 'cientifico_humanista' or 'tecnico_profesional_gastronomia'.`
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      })
     }
 
     // Configurar fecha del reporte en horario de Chile
@@ -91,7 +157,8 @@ serve(async (req) => {
       `
     } else {
       let electivesRows = ""
-      electivos.forEach((el: any) => {
+      const electivesArray = electivos || []
+      electivesArray.forEach((el: any) => {
         electivesRows += `
           <tr style="border-bottom: 1px solid #e2e8f0;">
             <td style="padding: 12px 0;">
@@ -162,14 +229,9 @@ serve(async (req) => {
       `
     }
 
-    // Consultar el secret de API de Resend desde variables de entorno
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    if (!RESEND_API_KEY) {
-      throw new Error("No se ha configurado la variable de entorno RESEND_API_KEY en Supabase.");
-    }
-
     // Consultar remitente desde variables de entorno o usar fallback por defecto
     const emailSender = Deno.env.get('EMAIL_FROM') || 'Liceo Arturo Alessandri Palma <no-reply@resend.dev>';
+    console.log("Remitente configurado (from):", emailSender);
 
     // Envío del correo vía API REST de Resend
     const res = await fetch('https://api.resend.com/emails', {
@@ -188,16 +250,36 @@ serve(async (req) => {
 
     if (!res.ok) {
       const errorText = await res.text();
-      throw new Error(`Fallo del servicio Resend: ${errorText}`);
+      let resendResult;
+      try {
+        resendResult = JSON.parse(errorText);
+      } catch {
+        resendResult = errorText;
+      }
+      console.error("Resend error response:", resendResult);
+      return new Response(JSON.stringify({
+        success: false,
+        error: "El servicio de correo de Resend reportó un error al procesar el mensaje.",
+        details: resendResult
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      })
     }
 
+    console.log("=== COMPLETED SEND-CONFIRMATION-EMAIL EXITOSAMENTE ===")
     return new Response(JSON.stringify({ success: true, message: 'Correo enviado correctamente.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200
     })
 
   } catch (error) {
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
+    console.error("send-confirmation-email error:", error)
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message,
+      details: error.stack || "Excepción general capturada en el catch principal."
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400
     })

@@ -563,6 +563,7 @@ export default function StudentPortal() {
       // 3. Invocar la Edge Function
       const { data: fnData, error: fnErr } = await supabase.functions.invoke('send-confirmation-email', {
         body: {
+          alumno_id: profile.id,
           email: stData.correo || profile.correo,
           nombre_completo: stData.nombre_completo || profile.nombre_completo,
           rut: stData.rut || profile.rut,
@@ -576,7 +577,9 @@ export default function StudentPortal() {
       });
 
       if (fnErr || (fnData && !fnData.success)) {
-        throw new Error(fnErr?.message || fnData?.error || 'Fallo desconocido en Edge Function');
+        const errorMsg = fnErr?.message || fnData?.error || 'Fallo desconocido en Edge Function';
+        const errorDetails = fnData?.details ? ` - Detalle: ${typeof fnData.details === 'object' ? JSON.stringify(fnData.details) : fnData.details}` : '';
+        throw new Error(`${errorMsg}${errorDetails}`);
       }
 
       // 4. Registrar estado en la base de datos como exitoso ('enviado')
@@ -594,7 +597,7 @@ export default function StudentPortal() {
         .update({ estado_correo: 'error' })
         .eq('id', profile.id);
 
-      showToast("⚠️ Tu elección fue registrada correctamente, pero no se pudo enviar el correo de respaldo. Contacta a UTP si necesitas comprobante.", "error");
+      showToast(`⚠️ Elección guardada con éxito, pero falló el correo: ${err.message}. Contacta a UTP si necesitas comprobante.`, "error");
     }
   };
 
