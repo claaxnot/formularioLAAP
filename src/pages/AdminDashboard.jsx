@@ -432,15 +432,26 @@ export default function AdminDashboard() {
           if (postErr) throw postErr;
 
           // 2. Borrar elecciones_modalidad
-          const { error: modErr } = await supabase.from('elecciones_modalidad').delete().eq('alumno_id', postItem.alumno_id);
+          const { data: modData, error: modErr } = await supabase
+            .from('elecciones_modalidad')
+            .delete()
+            .eq('alumno_id', postItem.alumno_id)
+            .select();
           if (modErr && modErr.code !== 'PGRST116') throw modErr;
 
           // 3. Resetear ya_postulo y estado_correo en la tabla alumnos
-          const { error: alumErr } = await supabase
+          const { data: alumData, error: alumErr } = await supabase
             .from('alumnos')
             .update({ ya_postulo: false, estado_correo: 'pendiente' })
-            .eq('id', postItem.alumno_id);
+            .eq('id', postItem.alumno_id)
+            .select();
+          
           if (alumErr) throw alumErr;
+
+          // Si el update se completó pero afectó 0 filas, indica que una política RLS lo está bloqueando silenciosamente
+          if (!alumData || alumData.length === 0) {
+            throw new Error("El sistema no tiene permisos suficientes para actualizar la tabla 'alumnos' (RLS en Supabase bloqueó la consulta silenciosamente).");
+          }
 
           // 4. Borrar del localStorage local
           localStorage.removeItem(`modalidad_${postItem.alumno_id}`);
@@ -466,15 +477,26 @@ export default function AdminDashboard() {
           if (postErr) throw postErr;
 
           // 2. Borrar elecciones_modalidad
-          const { error: modErr } = await supabase.from('elecciones_modalidad').delete().eq('alumno_id', student.id);
+          const { data: modData, error: modErr } = await supabase
+            .from('elecciones_modalidad')
+            .delete()
+            .eq('alumno_id', student.id)
+            .select();
           if (modErr && modErr.code !== 'PGRST116') throw modErr;
 
           // 3. Resetear ya_postulo y estado_correo en la tabla alumnos
-          const { error: alumErr } = await supabase
+          const { data: alumData, error: alumErr } = await supabase
             .from('alumnos')
             .update({ ya_postulo: false, estado_correo: 'pendiente' })
-            .eq('id', student.id);
+            .eq('id', student.id)
+            .select();
+          
           if (alumErr) throw alumErr;
+
+          // Si el update se completó pero afectó 0 filas, indica que una política RLS lo está bloqueando silenciosamente
+          if (!alumData || alumData.length === 0) {
+            throw new Error("El sistema no tiene permisos suficientes para actualizar la tabla 'alumnos' (RLS en Supabase bloqueó la consulta silenciosamente).");
+          }
 
           // 4. Borrar del localStorage local
           localStorage.removeItem(`modalidad_${student.id}`);
