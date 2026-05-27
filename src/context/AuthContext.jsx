@@ -311,34 +311,25 @@ export const AuthProvider = ({ children }) => {
   const [timeoutCountdown, setTimeoutCountdown] = useState(60);
   const inactivityTimerRef = React.useRef(null);
   const countdownIntervalRef = React.useRef(null);
+  const lastActivityRef = React.useRef(Date.now());
+  const warningTargetTimeRef = React.useRef(0);
 
   // CONTROL DE INACTIVIDAD GLOBAL DE 5 MINUTOS (300 SEGUNDOS)
   useEffect(() => {
     // Solo activar si el usuario está completamente autenticado con un rol válido
     if (!user || !role || role === 'unauthorized') {
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       setShowTimeoutWarning(false);
       return;
     }
+
+    // Inicializar timestamp
+    lastActivityRef.current = Date.now();
 
     const resetInactivityTimer = () => {
       // Si ya se está mostrando la advertencia de cuenta regresiva, no resetear
       // el temporizador mediante micromovimientos para obligar acción explícita.
       if (showTimeoutWarning) return;
-
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
-
-      // 4 minutos (240,000 ms) antes de mostrar la advertencia de 60 segundos
-      inactivityTimerRef.current = setTimeout(() => {
-        triggerTimeoutWarning();
-      }, 240000);
-    };
-
-    const triggerTimeoutWarning = () => {
-      console.log("[AuthContext] Inactividad detectada (4 minutos). Mostrando advertencia de 60s...");
-      setShowTimeoutWarning(true);
-      setTimeoutCountdown(60);
+      lastActivityRef.current = Date.now();
     };
 
     // Escuchar eventos de interacción del usuario
@@ -349,41 +340,70 @@ export const AuthProvider = ({ children }) => {
       window.addEventListener(event, resetWrapper);
     });
 
-    // Iniciar temporizador
-    resetInactivityTimer();
+    const handleVisibilityOrFocus = () => {
+      const now = Date.now();
+      const elapsed = now - lastActivityRef.current;
+      
+      if (showTimeoutWarning) {
+        if (now >= warningTargetTimeRef.current) {
+          handleAutoLogout();
+        } else {
+          const secondsRemaining = Math.max(0, Math.round((warningTargetTimeRef.current - now) / 1000));
+          setTimeoutCountdown(secondsRemaining);
+        }
+      } else {
+        if (elapsed >= 300000) {
+          handleAutoLogout();
+        } else if (elapsed >= 240000) {
+          warningTargetTimeRef.current = lastActivityRef.current + 300000;
+          setShowTimeoutWarning(true);
+          const secondsRemaining = Math.max(0, Math.round((warningTargetTimeRef.current - now) / 1000));
+          setTimeoutCountdown(secondsRemaining);
+        }
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    // Intervalo de chequeo activo segundo a segundo
+    const checkInterval = setInterval(() => {
+      const now = Date.now();
+      const elapsed = now - lastActivityRef.current;
+      
+      if (showTimeoutWarning) {
+        if (now >= warningTargetTimeRef.current) {
+          clearInterval(checkInterval);
+          handleAutoLogout();
+        } else {
+          const secondsRemaining = Math.max(0, Math.round((warningTargetTimeRef.current - now) / 1000));
+          setTimeoutCountdown(secondsRemaining);
+        }
+      } else {
+        if (elapsed >= 300000) {
+          clearInterval(checkInterval);
+          handleAutoLogout();
+        } else if (elapsed >= 240000) {
+          warningTargetTimeRef.current = lastActivityRef.current + 300000;
+          setShowTimeoutWarning(true);
+          setTimeoutCountdown(60);
+        }
+      }
+    }, 1000);
 
     return () => {
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      clearInterval(checkInterval);
       events.forEach(event => {
         window.removeEventListener(event, resetWrapper);
       });
+      window.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
     };
   }, [user, role, showTimeoutWarning]);
 
-  // Manejar el countdown de 60 segundos de la advertencia
-  useEffect(() => {
-    if (showTimeoutWarning) {
-      countdownIntervalRef.current = setInterval(() => {
-        setTimeoutCountdown(prev => {
-          if (prev <= 1) {
-            clearInterval(countdownIntervalRef.current);
-            handleAutoLogout();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    }
-
-    return () => {
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    };
-  }, [showTimeoutWarning]);
-
   const handleKeepAlive = () => {
     console.log("[AuthContext] Usuario confirmó seguir conectado. Reseteando temporizador...");
+    lastActivityRef.current = Date.now();
     setShowTimeoutWarning(false);
   };
 
@@ -405,90 +425,140 @@ export const AuthProvider = ({ children }) => {
         left: 0,
         width: '100%',
         height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.75)',
+        backgroundColor: 'rgba(15, 23, 42, 0.65)',
         backdropFilter: 'blur(8px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 999999,
-        fontFamily: "'Outfit', 'Inter', sans-serif"
+        fontFamily: "var(--font-family)",
+        animation: 'laap-fade-in 0.2s ease-out'
       }}>
         <div style={{
-          backgroundColor: '#111827',
-          border: '2px solid #f59e0b',
+          backgroundColor: '#ffffff',
           borderRadius: '16px',
-          padding: '28px',
-          maxWidth: '420px',
+          overflow: 'hidden',
           width: '90%',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-          color: '#f9fafb',
-          textAlign: 'center'
+          maxWidth: '400px',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          border: '1px solid #e2e8f0',
+          animation: 'laap-scale-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards'
         }}>
+          {/* Institutional Top Header */}
           <div style={{
-            display: 'inline-flex',
-            padding: '16px',
-            borderRadius: '50%',
-            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-            color: '#f59e0b',
-            marginBottom: '20px'
-          }}>
-            <svg viewBox="0 0 24 24" width="36" height="36" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-          </div>
+            height: '6px',
+            background: 'linear-gradient(90deg, var(--primary-color) 0%, #3b82f6 100%)'
+          }} />
+          
+          <div style={{ padding: '32px 28px', textAlign: 'center' }}>
+            {/* Elegant Institutional Icon */}
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '64px',
+              height: '64px',
+              borderRadius: '16px',
+              backgroundColor: 'rgba(30, 58, 138, 0.08)',
+              color: 'var(--primary-color)',
+              marginBottom: '20px'
+            }}>
+              <svg viewBox="0 0 24 24" width="32" height="32" stroke="currentColor" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+            </div>
 
-          <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 'bold' }}>¿Sigues ahí?</h3>
-          <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#9ca3af', lineHeight: '1.5' }}>
-            Tu sesión está a punto de cerrarse debido a inactividad en {role === 'admin' ? 'el panel administrativo' : 'el portal de estudiante'}.
-          </p>
+            <h3 style={{ 
+              margin: '0 0 10px 0', 
+              fontSize: '20px', 
+              fontWeight: '800', 
+              color: 'var(--secondary-color)',
+              letterSpacing: '-0.3px'
+            }}>
+              Sesión por Expirar
+            </h3>
+            
+            <p style={{ 
+              margin: '0 0 24px 0', 
+              fontSize: '13.5px', 
+              color: 'var(--text-muted)', 
+              lineHeight: '1.5',
+              fontWeight: '500'
+            }}>
+              Por motivos de seguridad institucional, su sesión administrativa en el panel finalizará debido a inactividad en:
+            </p>
 
-          <div style={{
-            fontSize: '36px',
-            fontWeight: '800',
-            color: '#f59e0b',
-            marginBottom: '24px',
-            fontFamily: 'monospace'
-          }}>
-            {timeoutCountdown}s
-          </div>
+            {/* Giant countdown timer */}
+            <div style={{
+              fontSize: '44px',
+              fontWeight: '800',
+              color: 'var(--primary-color)',
+              marginBottom: '28px',
+              letterSpacing: '-1px',
+              fontFamily: 'monospace',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}>
+              {timeoutCountdown}
+              <span style={{ fontSize: '20px', fontWeight: '700', color: '#64748b' }}>s</span>
+            </div>
 
-          <div style={{ display: 'flex', gap: '12px' }}>
-            <button 
-              onClick={handleAutoLogout}
-              style={{
-                flex: 1,
-                padding: '12px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255,255,255,0.1)',
-                backgroundColor: 'transparent',
-                color: '#d1d5db',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Cerrar Sesión
-            </button>
-            <button 
-              onClick={handleKeepAlive}
-              style={{
-                flex: 1,
-                padding: '12px',
-                borderRadius: '8px',
-                border: 'none',
-                backgroundColor: '#f59e0b',
-                color: '#111827',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              Permanecer Conectado
-            </button>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={handleAutoLogout}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: '1px solid #cbd5e1',
+                  backgroundColor: '#ffffff',
+                  color: '#475569',
+                  fontSize: '13.5px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f8fafc';
+                  e.currentTarget.style.borderColor = '#94a3b8';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
+                  e.currentTarget.style.borderColor = '#cbd5e1';
+                }}
+              >
+                Cerrar Sesión
+              </button>
+              <button 
+                onClick={handleKeepAlive}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  backgroundColor: 'var(--primary-color)',
+                  color: '#ffffff',
+                  fontSize: '13.5px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(30, 58, 138, 0.2)',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--primary-hover)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(30, 58, 138, 0.35)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--primary-color)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(30, 58, 138, 0.2)';
+                }}
+              >
+                Seguir Conectado
+              </button>
+            </div>
           </div>
         </div>
       </div>
