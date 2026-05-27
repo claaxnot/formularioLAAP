@@ -433,7 +433,7 @@ export default function AdminDashboard() {
 
           // 2. Borrar elecciones_modalidad
           const { error: modErr } = await supabase.from('elecciones_modalidad').delete().eq('alumno_id', postItem.alumno_id);
-          if (modErr && modErr.code !== 'PGRST116') console.warn("No se pudo eliminar de elecciones_modalidad:", modErr);
+          if (modErr && modErr.code !== 'PGRST116') throw modErr;
 
           // 3. Resetear ya_postulo y estado_correo en la tabla alumnos
           const { error: alumErr } = await supabase
@@ -467,7 +467,7 @@ export default function AdminDashboard() {
 
           // 2. Borrar elecciones_modalidad
           const { error: modErr } = await supabase.from('elecciones_modalidad').delete().eq('alumno_id', student.id);
-          if (modErr && modErr.code !== 'PGRST116') console.warn("No se pudo eliminar de elecciones_modalidad:", modErr);
+          if (modErr && modErr.code !== 'PGRST116') throw modErr;
 
           // 3. Resetear ya_postulo y estado_correo en la tabla alumnos
           const { error: alumErr } = await supabase
