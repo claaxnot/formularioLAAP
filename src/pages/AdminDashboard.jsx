@@ -1732,7 +1732,25 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="table-responsive">
-                  <table className="laap-admin-table">
+                  <table className="laap-admin-table roster-table" style={{ tableLayout: 'fixed', width: '100%', minWidth: '1020px' }}>
+                    <colgroup>
+                      <col style={{ width: '135px' }} />
+                      <col style={{ width: '175px' }} />
+                      <col style={{ width: '55px' }} />
+                      <col style={{ width: '110px' }} />
+                      <col style={{ width: '110px' }} />
+                      {sortedHorarios.map(h => (
+                        <col key={h.id} style={{ width: '105px' }} />
+                      ))}
+                      {sortedHorarios.length === 0 && (
+                        <>
+                          <col style={{ width: '105px' }} />
+                          <col style={{ width: '105px' }} />
+                          <col style={{ width: '105px' }} />
+                        </>
+                      )}
+                      <col style={{ width: '130px' }} />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th>Estudiante</th>
@@ -1775,14 +1793,16 @@ export default function AdminDashboard() {
                           return (
                             <tr key={st.id}>
                               <td>
-                                <strong>{formatNombre(st.nombre_completo)}</strong>
-                                <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>RUT: {st.rut || 'No registrado'}</span>
+                                <strong style={{ fontSize: '11.5px', display: 'block', lineHeight: '1.25' }}>{formatNombre(st.nombre_completo)}</strong>
+                                <span style={{ fontSize: '10px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>RUT: {st.rut || 'No registrado'}</span>
                               </td>
                               <td>
-                                <div>{st.correo}</div>
+                                <div style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '11px', fontWeight: '500' }} title={st.correo}>
+                                  {st.correo}
+                                </div>
                                 {(st.correo_apoderado_1 || st.correo_apoderado_2) && (
-                                  <div style={{ fontSize: '10.5px', color: '#60a5fa', marginTop: '5px', lineHeight: '1.3', display: 'flex', alignItems: 'center', gap: '4px' }} title="Correos de Apoderados registrados">
-                                    <span style={{ fontSize: '12px' }}>👨‍👩‍👦</span>
+                                  <div style={{ fontSize: '9.5px', color: '#60a5fa', marginTop: '4px', lineHeight: '1.2', display: 'flex', alignItems: 'center', gap: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`Apoderados: ${st.correo_apoderado_1 || '—'} / ${st.correo_apoderado_2 || '—'}`}>
+                                    <span>👨‍👩‍👦</span>
                                     <span>
                                       {st.correo_apoderado_1 || '—'}
                                       {st.correo_apoderado_2 ? ` / ${st.correo_apoderado_2}` : ''}
@@ -1790,55 +1810,55 @@ export default function AdminDashboard() {
                                   </div>
                                 )}
                               </td>
-                              <td>{st.curso_actual || '3° Medio'}</td>
+                              <td style={{ fontSize: '11px', textAlign: 'center', fontWeight: '600' }}>{st.curso_actual || '3° Medio'}</td>
                               <td>
                                 {isTP ? (
-                                  <span className="role-badge admin" style={{ fontSize: '11px', fontWeight: 'bold', padding: '3px 8px' }}>
+                                  <span className="role-badge admin" style={{ fontSize: '9.5px', fontWeight: 'bold', padding: '2px 5px', whiteSpace: 'nowrap' }}>
                                     TP (Gastronomía)
                                   </span>
                                 ) : isCH ? (
-                                  <span className="role-badge" style={{ fontSize: '11px', fontWeight: 'bold', padding: '3px 8px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa' }}>
-                                    Científico Humanista
+                                  <span className="role-badge" style={{ fontSize: '9.5px', fontWeight: 'bold', padding: '2px 5px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', whiteSpace: 'nowrap' }}>
+                                    C. Humanista
                                   </span>
                                 ) : (
-                                  <span style={{ color: 'var(--text-secondary)', fontSize: '11px', fontStyle: 'italic' }}>
+                                  <span style={{ color: 'var(--text-secondary)', fontSize: '9.5px', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
                                     Sin Declarar
                                   </span>
                                 )}
                               </td>
                               <td>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                   {isTP ? (
-                                    <span className="status-pill available" style={{ display: 'inline-flex', padding: '4px 8px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
+                                    <span className="status-pill available" style={{ display: 'inline-flex', padding: '2px 5px', fontSize: '9.5px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399', width: 'fit-content' }}>
                                       Finalizado (TP)
                                     </span>
                                   ) : hasSubmitted ? (
-                                    <span className="status-pill available" style={{ display: 'inline-flex', padding: '4px 8px' }}>
+                                    <span className="status-pill available" style={{ display: 'inline-flex', padding: '2px 5px', fontSize: '9.5px', width: 'fit-content' }}>
                                       Listo (CH)
                                     </span>
                                   ) : isCH ? (
-                                    <span className="status-pill full" style={{ display: 'inline-flex', padding: '4px 8px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>
-                                      En Selección CH
+                                    <span className="status-pill full" style={{ display: 'inline-flex', padding: '2px 5px', fontSize: '9.5px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', width: 'fit-content' }}>
+                                      En Sel. CH
                                     </span>
                                   ) : (
-                                    <span className="status-pill full" style={{ display: 'inline-flex', padding: '4px 8px' }}>
+                                    <span className="status-pill full" style={{ display: 'inline-flex', padding: '2px 5px', fontSize: '9.5px', width: 'fit-content' }}>
                                       Pendiente
                                     </span>
                                   )}
                                   
                                   {hasSubmitted && (
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
                                       {st.estado_correo === 'enviado' ? (
-                                        <span className="status-pill available" style={{ fontSize: '10px', padding: '2px 6px', fontWeight: 'bold', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                        <span className="status-pill available" style={{ fontSize: '9px', padding: '1px 4px', fontWeight: 'bold', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                                           📧 Enviado
                                         </span>
                                       ) : st.estado_correo === 'error' ? (
-                                        <span className="status-pill full" style={{ fontSize: '10px', padding: '2px 6px', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                        <span className="status-pill full" style={{ fontSize: '9px', padding: '1px 4px', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                                           📧 Error
                                         </span>
                                       ) : (
-                                        <span className="status-pill full" style={{ fontSize: '10px', padding: '2px 6px', fontWeight: 'bold', backgroundColor: 'rgba(156, 163, 175, 0.1)', color: '#9ca3af', border: '1px solid rgba(156, 163, 175, 0.2)' }}>
-                                          📧 Pendiente
+                                        <span className="status-pill full" style={{ fontSize: '9px', padding: '1px 4px', fontWeight: 'bold', backgroundColor: 'rgba(156, 163, 175, 0.1)', color: '#9ca3af', border: '1px solid rgba(156, 163, 175, 0.2)' }}>
+                                          📧 Pend.
                                         </span>
                                       )}
                                     </div>
@@ -1849,14 +1869,16 @@ export default function AdminDashboard() {
                                 const post = stPosts.find(p => String(p.horario_id) === String(h.id));
                                 const electiveName = post ? getElectiveName(post.electivo_id) : '—';
                                 return (
-                                  <td key={h.id} style={{ maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {isTP ? (
-                                      <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '11px' }}>Exento TP</span>
-                                    ) : (
-                                      <small title={electiveName} style={{ fontWeight: post ? '600' : 'normal', color: post ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '12px' }}>
-                                        {electiveName}
-                                      </small>
-                                    )}
+                                  <td key={h.id}>
+                                    <div style={{ maxWidth: '98px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={electiveName}>
+                                      {isTP ? (
+                                        <span style={{ color: '#10b981', fontWeight: 'bold', fontSize: '9.5px' }}>Exento TP</span>
+                                      ) : (
+                                        <small style={{ fontWeight: post ? '600' : 'normal', color: post ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '10.5px' }}>
+                                          {electiveName}
+                                        </small>
+                                      )}
+                                    </div>
                                   </td>
                                 );
                               })}
@@ -1868,28 +1890,28 @@ export default function AdminDashboard() {
                                 </>
                               )}
                               <td>
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                                   {hasAnyRegistration ? (
                                     <button
                                       className="btn-table-danger"
                                       onClick={() => handleResetStudentSelections(st)}
                                       title="Reiniciar y liberar proceso del alumno"
-                                      style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0, height: '28px' }}
+                                      style={{ padding: '3px 6px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px', margin: 0, height: '24px' }}
                                     >
-                                      <Trash2 size={12} />
+                                      <Trash2 size={10} />
                                       <span>Reiniciar</span>
                                     </button>
                                   ) : (
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '11px', marginRight: '6px' }}>—</span>
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '10px', marginRight: '4px' }}>—</span>
                                   )}
                                   
                                   <button
                                     className="btn-table-edit"
                                     onClick={() => handleOpenEditStudentModal(st)}
                                     title="Editar apoderados y ficha"
-                                    style={{ padding: '4px 8px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', margin: 0, height: '28px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}
+                                    style={{ padding: '3px 6px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px', margin: 0, height: '24px', backgroundColor: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.25)' }}
                                   >
-                                    <Edit3 size={12} />
+                                    <Edit3 size={10} />
                                     <span>Editar</span>
                                   </button>
                                 </div>

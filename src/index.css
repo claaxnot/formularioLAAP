@@ -2024,3 +2024,17 @@ body {
     padding: 18px;
   }
 }
+
+/* Roster Table Overrides for Full-Width Fit */
+.laap-admin-table.roster-table th {
+  padding: 8px 10px;
+  font-size: 0.72rem;
+  letter-spacing: -0.2px;
+  text-transform: uppercase;
+}
+
+.laap-admin-table.roster-table td {
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  vertical-align: middle;
+}
