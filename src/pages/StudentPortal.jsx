@@ -577,8 +577,31 @@ export default function StudentPortal() {
       });
 
       if (fnErr || (fnData && !fnData.success)) {
-        const errorMsg = fnErr?.message || fnData?.error || 'Fallo desconocido en Edge Function';
-        const errorDetails = fnData?.details ? ` - Detalle: ${typeof fnData.details === 'object' ? JSON.stringify(fnData.details) : fnData.details}` : '';
+        let errorMsg = fnErr?.message || fnData?.error || 'Fallo desconocido en Edge Function';
+        let errorDetails = fnData?.details ? ` - Detalle: ${typeof fnData.details === 'object' ? JSON.stringify(fnData.details) : fnData.details}` : '';
+
+        // Si la función falló con un status HTTP no exitoso (400, 500, etc.),
+        // supabase-js retorna un FunctionsHttpError con el Response en la propiedad 'context'.
+        // Leemos el cuerpo del Response real para obtener el JSON amigable con los detalles.
+        if (fnErr && fnErr.context) {
+          try {
+            const bodyText = await fnErr.context.text();
+            try {
+              const bodyJson = JSON.parse(bodyText);
+              errorMsg = bodyJson.error || errorMsg;
+              if (bodyJson.details) {
+                errorDetails = ` - Detalle: ${typeof bodyJson.details === 'object' ? JSON.stringify(bodyJson.details) : bodyJson.details}`;
+              }
+            } catch {
+              if (bodyText) {
+                errorMsg = bodyText;
+              }
+            }
+          } catch (e) {
+            console.warn("No se pudo leer el cuerpo de error de la función:", e);
+          }
+        }
+
         throw new Error(`${errorMsg}${errorDetails}`);
       }
 
