@@ -99,7 +99,7 @@ export default function AdminDashboard() {
       // 1. Cargar alumnos real
       const { data: stdData, error: stdErr } = await supabase
         .from('alumnos')
-        .select('id, rut, nombre_completo, correo, curso_actual, activo')
+        .select('id, rut, nombre_completo, correo, curso_actual, activo, ya_postulo, estado_correo, correo_apoderado_1, correo_apoderado_2')
         .order('nombre_completo');
       if (stdErr) throw stdErr;
 
