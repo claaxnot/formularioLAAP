@@ -229,8 +229,8 @@ serve(async (req) => {
       `
     }
 
-    // Consultar remitente desde variables de entorno o usar fallback por defecto
-    const emailSender = Deno.env.get('EMAIL_FROM') || 'Liceo Arturo Alessandri Palma <no-reply@resend.dev>';
+    // Forzar el remitente autorizado por Resend por defecto para evitar errores DNS
+    const emailSender = 'LAAP Electivos <onboarding@resend.dev>';
     console.log("Remitente configurado (from):", emailSender);
 
     // Envío del correo vía API REST de Resend
@@ -242,6 +242,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: emailSender,
+        reply_to: 'formularioelectivos@liceoalessandri.cl',
         to: toEmails,
         subject: 'Confirmación de elección académica - Liceo Arturo Alessandri Palma',
         html: emailHtml
