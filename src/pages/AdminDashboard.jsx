@@ -1777,13 +1777,19 @@ export default function AdminDashboard() {
                               <td>
                                 <strong>{formatNombre(st.nombre_completo)}</strong>
                                 <span style={{ fontSize: '11px', color: '#9ca3af', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>RUT: {st.rut || 'No registrado'}</span>
+                              </td>
+                              <td>
+                                <div>{st.correo}</div>
                                 {(st.correo_apoderado_1 || st.correo_apoderado_2) && (
-                                  <div style={{ fontSize: '10px', color: '#60a5fa', marginTop: '4px', lineHeight: '1.2' }} title="Correos de Apoderados registrados">
-                                    👨‍👩‍👦 {st.correo_apoderado_1 || '—'} {st.correo_apoderado_2 ? ` / ${st.correo_apoderado_2}` : ''}
+                                  <div style={{ fontSize: '10.5px', color: '#60a5fa', marginTop: '5px', lineHeight: '1.3', display: 'flex', alignItems: 'center', gap: '4px' }} title="Correos de Apoderados registrados">
+                                    <span style={{ fontSize: '12px' }}>👨‍👩‍👦</span>
+                                    <span>
+                                      {st.correo_apoderado_1 || '—'}
+                                      {st.correo_apoderado_2 ? ` / ${st.correo_apoderado_2}` : ''}
+                                    </span>
                                   </div>
                                 )}
                               </td>
-                              <td>{st.correo}</td>
                               <td>{st.curso_actual || '3° Medio'}</td>
                               <td>
                                 {isTP ? (
