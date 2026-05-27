@@ -435,7 +435,14 @@ export default function AdminDashboard() {
           const { error: modErr } = await supabase.from('elecciones_modalidad').delete().eq('alumno_id', postItem.alumno_id);
           if (modErr && modErr.code !== 'PGRST116') console.warn("No se pudo eliminar de elecciones_modalidad:", modErr);
 
-          // 3. Borrar del localStorage local
+          // 3. Resetear ya_postulo y estado_correo en la tabla alumnos
+          const { error: alumErr } = await supabase
+            .from('alumnos')
+            .update({ ya_postulo: false, estado_correo: 'pendiente' })
+            .eq('id', postItem.alumno_id);
+          if (alumErr) throw alumErr;
+
+          // 4. Borrar del localStorage local
           localStorage.removeItem(`modalidad_${postItem.alumno_id}`);
 
           showToast(`Selección y modalidad de ${studentName} reiniciadas correctamente.`, 'success');
@@ -462,7 +469,14 @@ export default function AdminDashboard() {
           const { error: modErr } = await supabase.from('elecciones_modalidad').delete().eq('alumno_id', student.id);
           if (modErr && modErr.code !== 'PGRST116') console.warn("No se pudo eliminar de elecciones_modalidad:", modErr);
 
-          // 3. Borrar del localStorage local
+          // 3. Resetear ya_postulo y estado_correo en la tabla alumnos
+          const { error: alumErr } = await supabase
+            .from('alumnos')
+            .update({ ya_postulo: false, estado_correo: 'pendiente' })
+            .eq('id', student.id);
+          if (alumErr) throw alumErr;
+
+          // 4. Borrar del localStorage local
           localStorage.removeItem(`modalidad_${student.id}`);
 
           showToast(`Proceso y modalidad de ${formattedName} reiniciados con éxito.`, 'success');
