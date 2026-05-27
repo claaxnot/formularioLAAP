@@ -99,29 +99,6 @@ serve(async (req) => {
       })
     }
 
-    // --- CONFIGURACIÓN MODO TEST / DEVELOPMENT ---
-    const isTestMode = Deno.env.get('EMAIL_TEST_MODE') === 'true' || Deno.env.get('RESEND_TEST_MODE') === 'true';
-    let finalToEmails = [...toEmails];
-    
-    if (isTestMode) {
-      console.log("=== MODO DE PRUEBA ACTIVO (EMAIL_TEST_MODE / RESEND_TEST_MODE = true) ===");
-      console.log("Redirigiendo destinatarios originales de Sandbox:", toEmails, "a la casilla verificada.");
-      finalToEmails = ['formularioelectivos@liceoalessandri.cl'];
-    }
-
-    const testBannerHtml = isTestMode ? `
-      <div style="background-color: #fef3c7; border: 1px solid #f59e0b; color: #b45309; padding: 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.5; margin-bottom: 24px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: left; box-sizing: border-box; width: 100%;">
-        <strong style="color: #d97706; font-size: 14.5px;">⚠️ MODO DE PRUEBA ACTIVO (SANDBOX RESEND)</strong><br>
-        Este comprobante de postulación académica fue redirigido automáticamente a la casilla de UTP porque el dominio del Liceo aún no está verificado en las DNS de Resend.<br><br>
-        <strong style="color: #4b5563;">Destinatarios originales que recibirán este correo en producción:</strong>
-        <ul style="margin: 6px 0 0 0; padding-left: 20px; color: #4b5563;">
-          <li><strong>Estudiante:</strong> ${email || 'No registrado'}</li>
-          <li><strong>Apoderado 1:</strong> ${correo_apoderado_1 || 'No registrado'}</li>
-          ${correo_apoderado_2 && correo_apoderado_2.trim() !== '' ? `<li><strong>Apoderado 2:</strong> ${correo_apoderado_2}</li>` : ''}
-        </ul>
-      </div>
-    ` : '';
-
     // Configurar fecha del reporte en horario de Chile
     const dateStr = new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' });
 
@@ -130,7 +107,6 @@ serve(async (req) => {
     if (modalidad === 'tecnico_profesional_gastronomia') {
       emailHtml = `
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-          ${testBannerHtml}
           <div style="text-align: center; border-bottom: 3px solid #10b981; padding-bottom: 24px; margin-bottom: 24px;">
             <h2 style="color: #10b981; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Comprobante de Selección Académica</h2>
             <p style="color: #64748b; margin: 6px 0 0 0; font-size: 14px; font-weight: 500;">Liceo Arturo Alessandri Palma</p>
@@ -198,7 +174,6 @@ serve(async (req) => {
 
       emailHtml = `
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff; color: #1e293b; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-          ${testBannerHtml}
           <div style="text-align: center; border-bottom: 3px solid #3b82f6; padding-bottom: 24px; margin-bottom: 24px;">
             <h2 style="color: #3b82f6; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Comprobante de Selección Académica</h2>
             <p style="color: #64748b; margin: 6px 0 0 0; font-size: 14px; font-weight: 500;">Liceo Arturo Alessandri Palma</p>
@@ -254,8 +229,8 @@ serve(async (req) => {
       `
     }
 
-    // Forzar el remitente autorizado por Resend por defecto para evitar errores DNS
-    const emailSender = 'LAAP Electivos <onboarding@resend.dev>';
+    // Configurar el remitente oficial y verificado del dominio del Liceo
+    const emailSender = 'Electivos LAAP <electivoslaap@fplb.cl>';
     console.log("Remitente configurado (from):", emailSender);
 
     // Envío del correo vía API REST de Resend
@@ -267,8 +242,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         from: emailSender,
-        reply_to: 'formularioelectivos@liceoalessandri.cl',
-        to: finalToEmails,
+        reply_to: 'electivoslaap@fplb.cl',
+        to: toEmails,
         subject: 'Confirmación de elección académica - Liceo Arturo Alessandri Palma',
         html: emailHtml
       })
