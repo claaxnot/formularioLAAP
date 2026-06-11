@@ -131,15 +131,15 @@ BEGIN
     DELETE FROM public.reservas_temporales
     WHERE alumno_id = p_alumno_id AND horario_id = p_horario_id;
 
-    -- 2. Crear la nueva reserva temporal por 5 minutos
-    v_expires_at := now() + interval '5 minutes';
+    -- 2. Crear la nueva reserva temporal por 1 minuto
+    v_expires_at := now() + interval '1 minute';
     
     INSERT INTO public.reservas_temporales (alumno_id, electivo_id, horario_id, expires_at)
     VALUES (p_alumno_id, p_electivo_id, p_horario_id, v_expires_at);
 
     RETURN jsonb_build_object(
         'success', true,
-        'message', format('Cupo retenido para "%s". Tienes 5 minutos para completar tu postulación.', v_nombre_electivo),
+        'message', format('Cupo retenido para "%s". Tienes 1 minuto para completar tu postulación.', v_nombre_electivo),
         'expires_at', v_expires_at,
         'electivo_nombre', v_nombre_electivo
     );

@@ -1087,7 +1087,7 @@ export default function AdminDashboard() {
               <div className="kpi-card">
                 <span className="kpi-label">Reservas Temporales</span>
                 <span className="kpi-value" style={{ color: '#fbbf24' }}>{activeTempReservationsCount}</span>
-                <span className="kpi-trend">Cupos retenidos por 5 min</span>
+                <span className="kpi-trend">Cupos retenidos por 1 min</span>
               </div>
               <div className="kpi-card">
                 <span className="kpi-label">Cupos Libres Reales</span>
