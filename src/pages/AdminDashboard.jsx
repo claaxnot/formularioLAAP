@@ -471,6 +471,15 @@ export default function AdminDashboard() {
             .select();
           if (modErr && modErr.code !== 'PGRST116') throw modErr;
 
+          // 2.5. Borrar acuse_recibo_apoderados (tokens de apoderados)
+          const { error: acuseErr } = await supabase
+            .from('acuse_recibo_apoderados')
+            .delete()
+            .eq('alumno_id', postItem.alumno_id);
+          if (acuseErr) {
+            console.warn("Fallo al borrar acuse_recibo_apoderados:", acuseErr);
+          }
+
           // 3. Resetear ya_postulo y estado_correo en la tabla alumnos
           const { data: alumData, error: alumErr } = await supabase
             .from('alumnos')
@@ -515,6 +524,15 @@ export default function AdminDashboard() {
             .eq('alumno_id', student.id)
             .select();
           if (modErr && modErr.code !== 'PGRST116') throw modErr;
+
+          // 2.5. Borrar acuse_recibo_apoderados (tokens de apoderados)
+          const { error: acuseErr } = await supabase
+            .from('acuse_recibo_apoderados')
+            .delete()
+            .eq('alumno_id', student.id);
+          if (acuseErr) {
+            console.warn("Fallo al borrar acuse_recibo_apoderados:", acuseErr);
+          }
 
           // 3. Resetear ya_postulo y estado_correo en la tabla alumnos
           const { data: alumData, error: alumErr } = await supabase
