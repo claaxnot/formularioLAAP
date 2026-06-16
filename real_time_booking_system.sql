@@ -224,3 +224,55 @@ $$;
 -- Explicitly grant RPC execution permissions to authenticated users
 GRANT EXECUTE ON FUNCTION public.reservar_electivo_temporal(UUID, UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.confirmar_postulacion_final(UUID) TO authenticated;
+
+-- ==========================================================================
+-- 5. FUNCIÓN RPC: reiniciar_ano_escolar (CLEAN UP ALL TRANSACTION DATA)
+-- ==========================================================================
+CREATE OR REPLACE FUNCTION public.reiniciar_ano_escolar(
+    p_limpiar_electivos BOOLEAN
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER -- Ejecuta con privilegios elevados para limpiar tablas
+AS $$
+BEGIN
+    -- 1. Limpiar reservas temporales
+    DELETE FROM public.reservas_temporales;
+
+    -- 2. Limpiar postulaciones
+    DELETE FROM public.postulaciones;
+
+    -- 3. Limpiar lista de espera
+    DELETE FROM public.lista_espera;
+
+    -- 4. Limpiar elecciones de modalidad
+    DELETE FROM public.elecciones_modalidad;
+
+    -- 5. Resetear columnas de estudiantes
+    UPDATE public.alumnos 
+    SET ya_postulo = FALSE, 
+        estado_correo = 'pendiente';
+
+    -- 6. Poner todos los procesos en inactivos (activo = false)
+    UPDATE public.procesos 
+    SET activo = FALSE;
+
+    -- 7. Limpiar electivos si se solicitó
+    IF p_limpiar_electivos = TRUE THEN
+        DELETE FROM public.electivos;
+    END IF;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'message', 'El año escolar ha sido reiniciado con éxito de forma limpia.'
+    );
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object(
+        'success', false,
+        'message', SQLERRM
+    );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.reiniciar_ano_escolar(BOOLEAN) TO authenticated;
+

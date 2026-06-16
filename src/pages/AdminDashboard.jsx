@@ -17,7 +17,12 @@ import {
   Clock,
   ListOrdered,
   AlertTriangle,
-  GraduationCap
+  GraduationCap,
+  Settings,
+  Database,
+  Upload,
+  RefreshCw,
+  UploadCloud
 } from 'lucide-react';
 
 const getStudentNivelDestino = (curso) => {
@@ -66,6 +71,14 @@ export default function AdminDashboard() {
   // Student Roster Edit Modal States
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+
+  // System maintenance states
+  const [importSummary, setImportSummary] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetConfirmationText, setResetConfirmationText] = useState('');
+  const [resetPreserveElectivos, setResetPreserveElectivos] = useState(true);
+  const [isResetting, setIsResetting] = useState(false);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -726,6 +739,217 @@ export default function AdminDashboard() {
     }
   };
 
+  // ==========================================
+  // SYSTEM MAINTENANCE HANDLERS
+  // ==========================================
+  const normalizeRut = (rut) => {
+    if (!rut) return '';
+    return String(rut).replace(/[\s\.\-]/g, '').toUpperCase();
+  };
+
+  const findColumnIndex = (headers, possibleNames) => {
+    return headers.findIndex(h => {
+      if (!h) return false;
+      const cleanedHeader = String(h).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return possibleNames.some(p => cleanedHeader === p.toLowerCase().trim());
+    });
+  };
+
+  const processImportedRoster = async (rawRows) => {
+    setIsImporting(true);
+    setImportSummary(null);
+    try {
+      const headers = rawRows[0];
+      
+      const rutIdx = findColumnIndex(headers, ['rut', 'r.u.t', 'run', 'identificacion', 'id', 'rut_alumno']);
+      const nombreIdx = findColumnIndex(headers, ['nombre completo', 'nombre', 'nombre_completo', 'nombres', 'estudiante', 'alumno', 'nombre completo estudiante']);
+      const correoIdx = findColumnIndex(headers, ['correo', 'email', 'correo electronico', 'mail', 'correo_estudiante', 'correo estudiante']);
+      const cursoIdx = findColumnIndex(headers, ['curso actual', 'curso_actual', 'curso', 'grado', 'nivel', 'curso estudiante']);
+      const apoderado1Idx = findColumnIndex(headers, ['correo_apoderado_1', 'correo apoderado 1', 'apoderado 1', 'email apoderado 1', 'correo_apoderado1', 'apoderado1', 'correo_apoderado_1_estudiante']);
+      const apoderado2Idx = findColumnIndex(headers, ['correo_apoderado_2', 'correo apoderado 2', 'apoderado 2', 'email apoderado 2', 'correo_apoderado2', 'apoderado2', 'correo_apoderado_2_estudiante']);
+      const activoIdx = findColumnIndex(headers, ['activo', 'active', 'habilitado', 'vigente']);
+
+      if (rutIdx === -1) {
+        showToast("No se encontró la columna 'RUT' en el archivo. Por favor verifica las cabeceras.", "error");
+        return;
+      }
+
+      // Fetch all existing students first to do in-memory lookup
+      const { data: existingStudents, error } = await supabase
+        .from('alumnos')
+        .select('*');
+        
+      if (error) {
+        showToast("Error al obtener alumnos existentes para la comparación: " + error.message, "error");
+        return;
+      }
+
+      // Create lookup map of normalized RUT -> student object
+      const studentsMap = {};
+      existingStudents.forEach(st => {
+        const norm = normalizeRut(st.rut);
+        if (norm) {
+          studentsMap[norm] = st;
+        }
+      });
+
+      let insertedCount = 0;
+      let updatedCount = 0;
+      let errorCount = 0;
+      const errorsList = [];
+
+      // Loop through rows
+      for (let i = 1; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        if (!row || row.length === 0) continue;
+        
+        // Check if the row is empty (all values are empty)
+        const isEmpty = row.every(val => val === undefined || val === null || String(val).trim() === '');
+        if (isEmpty) continue;
+
+        const rawRut = row[rutIdx];
+        if (!rawRut) {
+          errorCount++;
+          errorsList.push(`Fila ${i + 1}: RUT vacío.`);
+          continue;
+        }
+
+        const normRut = normalizeRut(rawRut);
+        const nombre = nombreIdx !== -1 && row[nombreIdx] ? String(row[nombreIdx]).trim() : '';
+        const correo = correoIdx !== -1 && row[correoIdx] ? String(row[correoIdx]).trim() : '';
+        const curso = cursoIdx !== -1 && row[cursoIdx] ? String(row[cursoIdx]).trim() : '3° Medio';
+        const apoderado1 = apoderado1Idx !== -1 && row[apoderado1Idx] ? String(row[apoderado1Idx]).trim() : null;
+        const apoderado2 = apoderado2Idx !== -1 && row[apoderado2Idx] ? String(row[apoderado2Idx]).trim() : null;
+        
+        let activo = true;
+        if (activoIdx !== -1 && row[activoIdx] !== undefined && row[activoIdx] !== null) {
+          const actVal = String(row[activoIdx]).toLowerCase().trim();
+          if (actVal === 'false' || actVal === '0' || actVal === 'no' || actVal === 'inactivo') {
+            activo = false;
+          }
+        }
+
+        const existingStudent = studentsMap[normRut];
+        
+        const payload = {
+          rut: String(rawRut).trim(),
+          nombre_completo: nombre,
+          correo: correo,
+          curso_actual: curso,
+          correo_apoderado_1: apoderado1 || null,
+          correo_apoderado_2: apoderado2 || null,
+          activo: activo
+        };
+
+        try {
+          if (existingStudent) {
+            // UPDATE existing student
+            const { error: updErr } = await supabase
+              .from('alumnos')
+              .update(payload)
+              .eq('id', existingStudent.id);
+              
+            if (updErr) throw updErr;
+            updatedCount++;
+          } else {
+            // INSERT new student
+            const { error: insErr } = await supabase
+              .from('alumnos')
+              .insert([payload]);
+              
+            if (insErr) throw insErr;
+            insertedCount++;
+          }
+        } catch (err) {
+          console.error(`Error en fila ${i + 1}:`, err);
+          errorCount++;
+          errorsList.push(`Fila ${i + 1} (RUT: ${rawRut}): ${err.message}`);
+        }
+      }
+
+      // Update UI and refresh admin data
+      await fetchAdminData(false);
+      
+      setImportSummary({
+        show: true,
+        inserted: insertedCount,
+        updated: updatedCount,
+        errors: errorCount,
+        errorsList: errorsList
+      });
+      
+      showToast(`Mantención de nómina finalizada. Insertados: ${insertedCount}, Actualizados: ${updatedCount}, Errores: ${errorCount}`, errorCount > 0 ? "warning" : "success");
+    } catch (err) {
+      console.error("Error al importar nómina:", err);
+      showToast("Error al procesar la carga masiva: " + err.message, "error");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        
+        // Parse raw rows (header: 1 returns array of arrays)
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        if (rawRows.length < 2) {
+          showToast("El archivo está vacío o no tiene suficientes filas.", "error");
+          return;
+        }
+        
+        await processImportedRoster(rawRows);
+      } catch (err) {
+        console.error("Error al leer archivo:", err);
+        showToast("Error al procesar archivo: " + err.message, "error");
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    // Reset file input value so same file can be uploaded again
+    e.target.value = null;
+  };
+
+  const handleSchoolYearReset = async (e) => {
+    e.preventDefault();
+    if (resetConfirmationText !== 'REINICIAR') {
+      showToast("Debes escribir la palabra REINICIAR exactamente para confirmar.", "error");
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      // Execute the reiniciar_ano_escolar RPC
+      const { data, error } = await supabase.rpc('reiniciar_ano_escolar', {
+        p_limpiar_electivos: !resetPreserveElectivos
+      });
+
+      if (error) throw error;
+
+      if (data && data.success === false) {
+        throw new Error(data.message);
+      }
+
+      showToast(data?.message || "Año escolar reiniciado correctamente.", "success");
+      setShowResetModal(false);
+      setResetConfirmationText('');
+      await fetchAdminData(true);
+    } catch (err) {
+      console.error("Error al reiniciar año escolar:", err);
+      showToast("No se pudo reiniciar el año escolar: " + err.message, "error");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   // UI Helper for Refresh Indicator
   const getUpdateIndicator = () => {
     return (
@@ -1021,6 +1245,13 @@ export default function AdminDashboard() {
           >
             <GraduationCap size={16} />
             <span>Modalidades TP ({eleccionesModalidad.filter(m => m.modalidad === 'tecnico_profesional_gastronomia').length})</span>
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'mantenimiento' ? 'active' : ''}`}
+            onClick={() => setActiveTab('mantenimiento')}
+          >
+            <Settings size={16} />
+            <span>Mantenimiento</span>
           </button>
         </div>
 
@@ -2050,6 +2281,202 @@ export default function AdminDashboard() {
           );
         })()}
 
+        {activeTab === 'mantenimiento' && (
+          <div className="admin-tab-content animate-fadeIn">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', margin: '20px 0' }}>
+              
+              {/* CARD 1: ACTUALIZAR NÓMINA */}
+              <div style={{
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '24px',
+                boxShadow: 'var(--shadow-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{
+                      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                      color: '#3b82f6',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <UploadCloud size={24} />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Actualizar Nómina</h3>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Carga masiva de estudiantes</span>
+                    </div>
+                  </div>
+                  
+                  <p style={{ fontSize: '13.5px', lineHeight: '1.5', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                    Sube un archivo Excel (<code>.xlsx</code>) o CSV para actualizar los datos de la matrícula vigente. El sistema buscará coincidencias mediante el campo <strong>RUT</strong>.
+                  </p>
+                  
+                  <ul style={{ fontSize: '12.5px', color: 'var(--text-secondary)', paddingLeft: '20px', lineHeight: '1.6', marginBottom: '24px' }}>
+                    <li>Si el RUT existe, se actualizarán sus datos personales y correos de apoderados.</li>
+                    <li>Si el RUT no existe, se creará un estudiante nuevo en la matrícula.</li>
+                    <li>No se alterarán las elecciones de electivos ni las modalidades existentes.</li>
+                  </ul>
+                </div>
+                
+                <div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <label 
+                      htmlFor="csv-upload-input" 
+                      className="laap-btn-primary" 
+                      style={{ 
+                        margin: 0, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: '8px', 
+                        cursor: isImporting ? 'not-allowed' : 'pointer',
+                        opacity: isImporting ? 0.7 : 1
+                      }}
+                    >
+                      {isImporting ? <RefreshCw className="animate-spin" size={16} /> : <Upload size={16} />}
+                      <span>{isImporting ? 'Procesando nómina...' : 'Seleccionar Archivo (Excel/CSV)'}</span>
+                    </label>
+                    <input 
+                      id="csv-upload-input"
+                      type="file" 
+                      accept=".xlsx, .xls, .csv" 
+                      onChange={handleFileUpload} 
+                      disabled={isImporting}
+                      style={{ display: 'none' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* CARD 2: REINICIAR AÑO ESCOLAR */}
+              <div style={{
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '24px',
+                boxShadow: 'var(--shadow-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                      color: '#ef4444',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Trash2 size={24} />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Reiniciar Año Escolar</h3>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Operación altamente destructiva</span>
+                    </div>
+                  </div>
+                  
+                  <p style={{ fontSize: '13.5px', lineHeight: '1.5', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                    Limpia los registros de selección de electivos y vacantes para dar inicio a un nuevo año lectivo. 
+                  </p>
+                  
+                  <div style={{
+                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    marginBottom: '20px'
+                  }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                      <AlertTriangle size={16} style={{ color: '#ef4444', flexShrink: 0, marginTop: '2px' }} />
+                      <div style={{ fontSize: '12px', color: '#fca5a5', lineHeight: '1.4' }}>
+                        Se eliminarán permanentemente todas las postulaciones, reservas temporales, listas de espera y modalidades técnico-profesionales de los alumnos. No se borrarán las cuentas de alumnos ni administradores.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <button 
+                    onClick={() => {
+                      setResetConfirmationText('');
+                      setShowResetModal(true);
+                    }}
+                    className="laap-btn-danger" 
+                    style={{ margin: 0, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                  >
+                    <Trash2 size={16} />
+                    <span>Iniciar Reinicio de Año Escolar</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* IMPORT SUMMARY REPORT */}
+            {importSummary && importSummary.show && (
+              <div style={{
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '24px',
+                marginTop: '24px',
+                boxShadow: 'var(--shadow-subtle)'
+              }}>
+                <h3 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <CheckCircle size={18} style={{ color: '#10b981' }} />
+                  Resumen de la Carga de Nómina
+                </h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                  <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', fontWeight: 'bold' }}>ALUMNOS NUEVOS</span>
+                    <strong style={{ fontSize: '20px', color: '#10b981' }}>{importSummary.inserted}</strong>
+                  </div>
+                  <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', fontWeight: 'bold' }}>ALUMNOS ACTUALIZADOS</span>
+                    <strong style={{ fontSize: '20px', color: '#3b82f6' }}>{importSummary.updated}</strong>
+                  </div>
+                  <div style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', fontWeight: 'bold' }}>ERRORES / SALTADOS</span>
+                    <strong style={{ fontSize: '20px', color: importSummary.errors > 0 ? '#ef4444' : 'var(--text-secondary)' }}>{importSummary.errors}</strong>
+                  </div>
+                </div>
+
+                {importSummary.errorsList && importSummary.errorsList.length > 0 && (
+                  <div style={{ marginTop: '16px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#ef4444', fontWeight: 'bold' }}>Detalle de Advertencias y Errores:</h4>
+                    <div style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                      border: '1px solid rgba(239, 68, 68, 0.15)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      fontFamily: 'monospace',
+                      fontSize: '11.5px',
+                      color: '#fca5a5'
+                    }}>
+                      {importSummary.errorsList.map((err, idx) => (
+                        <div key={idx} style={{ marginBottom: '4px' }}>• {err}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* MODAL CREAR / EDITAR ELECTIVO */}
         {showModal && (
           <div className="laap-modal-backdrop">
@@ -2353,6 +2780,134 @@ export default function AdminDashboard() {
                   </button>
                   <button type="submit" className="laap-btn-primary">
                     Guardar Cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL REINICIAR AÑO ESCOLAR */}
+        {showResetModal && (
+          <div className="laap-modal-backdrop">
+            <div className="laap-modal-card animate-scaleIn" style={{ maxWidth: '480px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid rgba(239, 68, 68, 0.15)' }}>
+                <h2 style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontSize: '20px' }}>
+                  <AlertTriangle size={20} />
+                  ¿Reiniciar Año Escolar?
+                </h2>
+                <button className="btn-modal-close" onClick={() => setShowResetModal(false)}>×</button>
+              </div>
+
+              <form onSubmit={handleSchoolYearReset} className="modal-form" style={{ marginTop: '16px' }}>
+                <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.5', margin: '0 0 16px 0' }}>
+                  Estás a punto de borrar todos los datos transaccionales del proceso actual para iniciar un nuevo periodo lectivo. Esta acción <strong>no se puede deshacer</strong>.
+                </p>
+
+                <div style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                  border: '1px solid rgba(239, 68, 68, 0.15)',
+                  borderRadius: '8px',
+                  padding: '12px 14px',
+                  marginBottom: '20px',
+                  fontSize: '12px',
+                  color: '#fca5a5',
+                  lineHeight: '1.5'
+                }}>
+                  <strong>Se realizarán las siguientes acciones:</strong>
+                  <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+                    <li>Eliminar permanentemente todas las postulaciones confirmadas.</li>
+                    <li>Eliminar todas las reservas de cupos temporales.</li>
+                    <li>Vaciar todas las listas de espera de los electivos.</li>
+                    <li>Eliminar todas las elecciones de modalidad Técnico-Profesional (Gastronomía).</li>
+                    <li>Restablecer a todos los estudiantes (<code>ya_postulo = false</code>, <code>estado_correo = 'pendiente'</code>).</li>
+                    <li>Cerrar todos los procesos activos de postulación (3M y 4M).</li>
+                  </ul>
+                </div>
+
+                {/* OPCIÓN ADICIONAL: LIMPIAR ELECTIVOS */}
+                <div className="form-group" style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  gap: '8px', 
+                  padding: '12px',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid var(--border-color)',
+                  marginBottom: '20px'
+                }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: 'var(--text-primary)' }}>¿Qué hacer con las asignaturas electivas creadas?</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                    <input
+                      type="radio"
+                      id="preserveElectivosTrue"
+                      name="preserveElectivos"
+                      checked={resetPreserveElectivos === true}
+                      onChange={() => setResetPreserveElectivos(true)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <label htmlFor="preserveElectivosTrue" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                      Mantener las asignaturas electivas vigentes
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="radio"
+                      id="preserveElectivosFalse"
+                      name="preserveElectivos"
+                      checked={resetPreserveElectivos === false}
+                      onChange={() => setResetPreserveElectivos(false)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <label htmlFor="preserveElectivosFalse" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: '#fca5a5' }}>
+                      Borrar también todas las asignaturas electivas
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontWeight: 'bold', fontSize: '12.5px', color: 'var(--text-primary)' }}>
+                    Para confirmar, escribe la palabra <strong style={{ color: '#ef4444' }}>REINICIAR</strong>:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    style={{ 
+                      width: '100%', 
+                      padding: '10px', 
+                      borderRadius: '6px', 
+                      border: '1px solid rgba(239, 68, 68, 0.3)', 
+                      backgroundColor: 'rgba(0,0,0,0.2)', 
+                      color: 'white',
+                      fontFamily: 'monospace',
+                      fontWeight: 'bold',
+                      letterSpacing: '1px',
+                      textAlign: 'center',
+                      marginTop: '6px'
+                    }}
+                    placeholder="REINICIAR"
+                    value={resetConfirmationText}
+                    onChange={(e) => setResetConfirmationText(e.target.value)}
+                  />
+                </div>
+
+                <div className="modal-actions" style={{ marginTop: '24px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '16px' }}>
+                  <button 
+                    type="button" 
+                    className="laap-btn-text" 
+                    onClick={() => setShowResetModal(false)}
+                    disabled={isResetting}
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="laap-btn-danger"
+                    disabled={isResetting || resetConfirmationText !== 'REINICIAR'}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    {isResetting ? <RefreshCw className="animate-spin" size={14} /> : null}
+                    <span>{isResetting ? 'Reiniciando...' : 'Sí, Reiniciar Todo'}</span>
                   </button>
                 </div>
               </form>
