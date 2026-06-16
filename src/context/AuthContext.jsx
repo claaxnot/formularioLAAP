@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
   const showToast = (message, type = 'success') => {
     const id = Date.now();
     setToast({ message, type, id });
-    
+
     // Auto-remove after 4 seconds
     setTimeout(() => {
       setToast(current => current?.id === id ? null : current);
@@ -180,7 +180,7 @@ export const AuthProvider = ({ children }) => {
         console.log("[AuthContext] Buscando en administradores...");
         let { data, error } = await withTimeout(
           supabase.from('administradores').select('*').eq('correo', email).eq('activo', true),
-          15000
+          3500
         );
         if (error && (error.code === 'PGRST204' || error.code === '42703')) {
           const fallback = await supabase.from('administradores').select('*').eq('email', email).eq('activo', true);
@@ -210,7 +210,7 @@ export const AuthProvider = ({ children }) => {
         console.log("[AuthContext] Buscando en alumnos...");
         let { data, error } = await withTimeout(
           supabase.from('alumnos').select('*').eq('correo', email),
-          15000
+          3500
         );
         if (error && (error.code === 'PGRST204' || error.code === '42703')) {
           const fallback = await supabase.from('alumnos').select('*').eq('email', email);
@@ -256,7 +256,7 @@ export const AuthProvider = ({ children }) => {
         const adminErrMsg = adminError ? (adminError.message || JSON.stringify(adminError)) : 'ninguno';
         const studentErrMsg = studentError ? (studentError.message || JSON.stringify(studentError)) : 'ninguno';
         console.warn(`[AuthContext] Error temporal de conexión detectado. Reintentando... AdminError: "${adminErrMsg}", StudentError: "${studentErrMsg}"`);
-        
+
         lastResolvedEmail.current = null;
         resolvingRef.current = false;
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -278,8 +278,8 @@ export const AuthProvider = ({ children }) => {
       // C. No está registrado en ninguna tabla y no hubo errores de red (acceso no autorizado)
       console.log("[AuthContext] Correo verificado pero no está registrado en la matrícula.");
       setRole('unauthorized');
-      setProfile({ 
-        email, 
+      setProfile({
+        email,
         isDevMode: true,
         debugDetails: {
           adminQuery: { data: null, error: adminError },
@@ -294,8 +294,8 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       console.error("Error crítico al resolver rol del usuario:", err);
       setRole('unauthorized');
-      setProfile({ 
-        email, 
+      setProfile({
+        email,
         isDevMode: true,
         debugDetails: {
           caughtError: err.message || String(err),
@@ -343,7 +343,7 @@ export const AuthProvider = ({ children }) => {
     const handleVisibilityOrFocus = () => {
       const now = Date.now();
       const elapsed = now - lastActivityRef.current;
-      
+
       if (showTimeoutWarning) {
         if (now >= warningTargetTimeRef.current) {
           handleAutoLogout();
@@ -370,7 +370,7 @@ export const AuthProvider = ({ children }) => {
     const checkInterval = setInterval(() => {
       const now = Date.now();
       const elapsed = now - lastActivityRef.current;
-      
+
       if (showTimeoutWarning) {
         if (now >= warningTargetTimeRef.current) {
           clearInterval(checkInterval);
@@ -449,7 +449,7 @@ export const AuthProvider = ({ children }) => {
             height: '6px',
             background: 'linear-gradient(90deg, var(--primary-color) 0%, #3b82f6 100%)'
           }} />
-          
+
           <div style={{ padding: '32px 28px', textAlign: 'center' }}>
             {/* Elegant Institutional Icon */}
             <div style={{
@@ -469,20 +469,20 @@ export const AuthProvider = ({ children }) => {
               </svg>
             </div>
 
-            <h3 style={{ 
-              margin: '0 0 10px 0', 
-              fontSize: '20px', 
-              fontWeight: '800', 
+            <h3 style={{
+              margin: '0 0 10px 0',
+              fontSize: '20px',
+              fontWeight: '800',
               color: 'var(--secondary-color)',
               letterSpacing: '-0.3px'
             }}>
               Sesión por Expirar
             </h3>
-            
-            <p style={{ 
-              margin: '0 0 24px 0', 
-              fontSize: '13.5px', 
-              color: 'var(--text-muted)', 
+
+            <p style={{
+              margin: '0 0 24px 0',
+              fontSize: '13.5px',
+              color: 'var(--text-muted)',
               lineHeight: '1.5',
               fontWeight: '500'
             }}>
@@ -507,7 +507,7 @@ export const AuthProvider = ({ children }) => {
             </div>
 
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button 
+              <button
                 onClick={handleAutoLogout}
                 style={{
                   flex: 1,
@@ -532,7 +532,7 @@ export const AuthProvider = ({ children }) => {
               >
                 Cerrar Sesión
               </button>
-              <button 
+              <button
                 onClick={handleKeepAlive}
                 style={{
                   flex: 1,
@@ -632,7 +632,7 @@ export const AuthProvider = ({ children }) => {
           )}
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button 
+            <button
               onClick={logout}
               style={{
                 flex: 1,
@@ -649,7 +649,7 @@ export const AuthProvider = ({ children }) => {
             >
               Cerrar Sesión
             </button>
-            <button 
+            <button
               onClick={async () => {
                 setLoading(true);
                 const currentUser = user;
@@ -728,14 +728,14 @@ export const AuthProvider = ({ children }) => {
   // Login de Demostración local (Mock) para desarrollo
   const loginAsDemo = async (demoRole, customEmail, realProfileData = {}) => {
     setLoading(true);
-    
+
     const mockUser = {
       id: realProfileData.id || (demoRole === 'admin' ? 'demo-admin-id' : 'demo-student-id'),
       email: customEmail,
-      user_metadata: { 
-        full_name: demoRole === 'admin' 
-          ? (realProfileData.nombre || 'Administrador de Pruebas') 
-          : (realProfileData.nombre_completo || 'Alumno de Pruebas') 
+      user_metadata: {
+        full_name: demoRole === 'admin'
+          ? (realProfileData.nombre || 'Administrador de Pruebas')
+          : (realProfileData.nombre_completo || 'Alumno de Pruebas')
       }
     };
 
@@ -792,7 +792,7 @@ export const AuthProvider = ({ children }) => {
   };
   const renderToast = () => {
     if (!toast) return null;
-    
+
     const bgColor = {
       success: '#10b981', // emerald
       error: '#ef4444', // rose
@@ -858,7 +858,7 @@ export const AuthProvider = ({ children }) => {
         <div style={{ flex: 1, lineHeight: '1.4' }}>
           {toast.message}
         </div>
-        <button 
+        <button
           onClick={() => setToast(null)}
           style={{
             background: 'none',
