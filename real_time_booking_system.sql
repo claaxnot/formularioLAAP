@@ -248,16 +248,19 @@ BEGIN
     -- 4. Limpiar elecciones de modalidad
     DELETE FROM public.elecciones_modalidad;
 
-    -- 5. Resetear columnas de estudiantes
+    -- 5. Limpiar acuses de recibo de apoderados
+    DELETE FROM public.acuse_recibo_apoderados;
+
+    -- 6. Resetear columnas de estudiantes
     UPDATE public.alumnos 
     SET ya_postulo = FALSE, 
         estado_correo = 'pendiente';
 
-    -- 6. Poner todos los procesos en inactivos (activo = false)
+    -- 7. Poner todos los procesos en inactivos (activo = false)
     UPDATE public.procesos 
     SET activo = FALSE;
 
-    -- 7. Limpiar electivos si se solicitó
+    -- 8. Limpiar electivos si se solicitó
     IF p_limpiar_electivos = TRUE THEN
         DELETE FROM public.electivos;
     END IF;
@@ -275,4 +278,147 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.reiniciar_ano_escolar(BOOLEAN) TO authenticated;
+
+-- ==========================================================================
+-- 6. TABLA Y FUNCIONES DE ACUSE DE RECIBO DE APODERADOS
+-- ==========================================================================
+CREATE TABLE IF NOT EXISTS public.acuse_recibo_apoderados (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    alumno_id UUID REFERENCES public.alumnos(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    correo_destinatario TEXT NOT NULL,
+    tipo_confirmacion TEXT NOT NULL, -- 'apoderado_1' o 'apoderado_2'
+    confirmado BOOLEAN DEFAULT false,
+    confirmado_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    user_agent TEXT,
+    ip_address TEXT
+);
+
+-- Habilitar RLS en acuse_recibo_apoderados
+ALTER TABLE public.acuse_recibo_apoderados ENABLE ROW LEVEL SECURITY;
+
+-- Permitir a administradores realizar cualquier acción
+CREATE POLICY "Admins full control on acuse"
+ON public.acuse_recibo_apoderados
+FOR ALL
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM public.administradores 
+        WHERE correo = auth.jwt()->>'email' AND activo = true
+    )
+);
+
+-- RPC: obtener_datos_acuse (Security Definer para saltar RLS en alumnos y postulaciones de forma controlada)
+CREATE OR REPLACE FUNCTION public.obtener_datos_acuse(p_token TEXT)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_record RECORD;
+    v_alumno_nombre TEXT;
+    v_alumno_curso TEXT;
+    v_modalidad TEXT;
+    v_electivos JSONB;
+BEGIN
+    -- Buscar el acuse por token
+    SELECT * INTO v_record
+    FROM public.acuse_recibo_apoderados
+    WHERE token = p_token;
+
+    IF v_record IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Token de acuse inválido o inexistente.');
+    END IF;
+
+    -- Obtener datos del alumno
+    SELECT nombre_completo, curso_actual INTO v_alumno_nombre, v_alumno_curso
+    FROM public.alumnos
+    WHERE id = v_record.alumno_id;
+
+    -- Determinar modalidad elegida
+    SELECT modalidad INTO v_modalidad
+    FROM public.elecciones_modalidad
+    WHERE alumno_id = v_record.alumno_id
+    LIMIT 1;
+
+    -- Si no hay registro de modalidad, ver si tiene postulaciones
+    IF v_modalidad IS NULL THEN
+        IF EXISTS (SELECT 1 FROM public.postulaciones WHERE alumno_id = v_record.alumno_id) THEN
+            v_modalidad := 'cientifico_humanista';
+        END IF;
+    END IF;
+
+    -- Obtener electivos seleccionados
+    SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'nombre', e.nombre,
+        'horario_nombre', h.nombre,
+        'area_codigo', a.codigo
+    )), '[]'::jsonb) INTO v_electivos
+    FROM public.postulaciones p
+    JOIN public.electivos e ON p.electivo_id = e.id
+    JOIN public.horarios h ON p.horario_id = h.id
+    JOIN public.areas a ON e.area_id = a.id
+    WHERE p.alumno_id = v_record.alumno_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'alumno_nombre', v_alumno_nombre,
+        'alumno_curso', v_alumno_curso,
+        'modalidad', v_modalidad,
+        'electivos', v_electivos,
+        'confirmado', v_record.confirmado,
+        'confirmado_at', v_record.confirmado_at,
+        'correo_destinatario', v_record.correo_destinatario,
+        'tipo_confirmacion', v_record.tipo_confirmacion
+    );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.obtener_datos_acuse(TEXT) TO anon, authenticated;
+
+-- RPC: confirmar_acuse_recibo (Security Definer)
+CREATE OR REPLACE FUNCTION public.confirmar_acuse_recibo(
+    p_token TEXT,
+    p_user_agent TEXT,
+    p_ip_address TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_record RECORD;
+BEGIN
+    -- Buscar el acuse por token
+    SELECT * INTO v_record
+    FROM public.acuse_recibo_apoderados
+    WHERE token = p_token;
+
+    IF v_record IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Token de acuse inválido o inexistente.');
+    END IF;
+
+    IF v_record.confirmado = TRUE THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Este acuse de recibo ya fue confirmado anteriormente.');
+    END IF;
+
+    -- Actualizar el acuse
+    UPDATE public.acuse_recibo_apoderados
+    SET confirmado = TRUE,
+        confirmado_at = now(),
+        user_agent = p_user_agent,
+        ip_address = p_ip_address
+    WHERE token = p_token;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'message', 'Acuse de recibo confirmado con éxito.'
+    );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.confirmar_acuse_recibo(TEXT, TEXT, TEXT) TO anon, authenticated;
+
 

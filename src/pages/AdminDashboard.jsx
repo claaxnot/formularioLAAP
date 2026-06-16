@@ -22,7 +22,8 @@ import {
   Database,
   Upload,
   RefreshCw,
-  UploadCloud
+  UploadCloud,
+  ShieldCheck
 } from 'lucide-react';
 
 const getStudentNivelDestino = (curso) => {
@@ -57,6 +58,9 @@ export default function AdminDashboard() {
   const [activeProcess4M, setActiveProcess4M] = useState(null);
   const [lastUpdated, setLastUpdated] = useState('');
   const [statsFilter, setStatsFilter] = useState('all'); // 'all', '3M', '4M'
+  const [acuseRecibos, setAcuseRecibos] = useState([]);
+  const [acuseFilter, setAcuseFilter] = useState('all'); // 'all', 'pending', 'confirmed'
+  const [acuseSearchQuery, setAcuseSearchQuery] = useState('');
 
   // Search Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -189,6 +193,21 @@ export default function AdminDashboard() {
       setWaitlist(wlData || []);
       setHorarios(horData || []);
       setAreas(areaData || []);
+
+      // 8.8. Cargar acuses de recibo de apoderados
+      try {
+        const { data: acData, error: acErr } = await supabase
+          .from('acuse_recibo_apoderados')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!acErr && acData) {
+          setAcuseRecibos(acData);
+        } else if (acErr) {
+          console.warn("Error al cargar acuse_recibo_apoderados:", acErr);
+        }
+      } catch (err) {
+        console.warn("Excepción al cargar acuse_recibo_apoderados:", err);
+      }
 
       // 9. Cargar elecciones_modalidad real (o fallback local)
       let modData = [];
@@ -950,6 +969,36 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleExportAcusesExcel = () => {
+    try {
+      const reportRows = acuseRecibos.map(ac => {
+        const student = students.find(s => s.id === ac.alumno_id) || {};
+        return {
+          'Estudiante': student.nombre_completo || 'Desconocido',
+          'RUT Estudiante': student.rut || '—',
+          'Curso Estudiante': student.curso_actual || '—',
+          'Correo Apoderado': ac.correo_destinatario || '—',
+          'Tipo de Apoderado': ac.tipo_confirmacion === 'apoderado_1' ? 'Principal (1)' : 'Secundario (2)',
+          'Estado': ac.confirmado ? 'CONFIRMADO' : 'PENDIENTE',
+          'Fecha Confirmación': ac.confirmado_at ? new Date(ac.confirmado_at).toLocaleString('es-CL') : '—',
+          'Fecha Creación Envío': ac.created_at ? new Date(ac.created_at).toLocaleString('es-CL') : '—',
+          'Navegador/Dispositivo': ac.user_agent || '—',
+          'Dirección IP': ac.ip_address || '—'
+        };
+      });
+
+      const ws = XLSX.utils.json_to_sheet(reportRows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Acuses Apoderados');
+
+      XLSX.writeFile(wb, `Reporte_Acuses_Apoderados_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      showToast("Reporte de acuses exportado exitosamente a Excel.", "success");
+    } catch (err) {
+      console.error("Error al exportar acuses a Excel:", err);
+      showToast("No se pudo exportar el reporte a Excel: " + err.message, "error");
+    }
+  };
+
   // UI Helper for Refresh Indicator
   const getUpdateIndicator = () => {
     return (
@@ -1015,6 +1064,23 @@ export default function AdminDashboard() {
   // Cupos estrictamente libres (restando postulaciones y reservas temporales)
   const totalSeatsRemaining = Math.max(0, totalSeatsCapacity - totalSeatsOccupied - activeTempReservationsCount);
   const totalWaitlistedCount = filteredWaitlistForStats.length;
+
+  const filteredAcuseRecibos = acuseRecibos.filter(ac => {
+    const student = students.find(s => s.id === ac.alumno_id) || {};
+    const studentName = (student.nombre_completo || '').toLowerCase();
+    const studentRut = (student.rut || '').toLowerCase();
+    const apoderadoEmail = (ac.correo_destinatario || '').toLowerCase();
+    
+    const matchesSearch = studentName.includes(acuseSearchQuery.toLowerCase()) || 
+                          studentRut.includes(acuseSearchQuery.toLowerCase()) ||
+                          apoderadoEmail.includes(acuseSearchQuery.toLowerCase());
+                          
+    const matchesFilter = acuseFilter === 'all' || 
+                          (acuseFilter === 'pending' && !ac.confirmado) || 
+                          (acuseFilter === 'confirmed' && ac.confirmado);
+                          
+    return matchesSearch && matchesFilter;
+  });
 
   if (loading) {
     return (
@@ -1252,6 +1318,13 @@ export default function AdminDashboard() {
           >
             <Settings size={16} />
             <span>Mantenimiento</span>
+          </button>
+          <button
+            className={`admin-tab-btn ${activeTab === 'acuses' ? 'active' : ''}`}
+            onClick={() => setActiveTab('acuses')}
+          >
+            <ShieldCheck size={16} />
+            <span>Acuses de Recibo ({acuseRecibos.length})</span>
           </button>
         </div>
 
@@ -2474,6 +2547,187 @@ export default function AdminDashboard() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'acuses' && (
+          <div className="admin-tab-content animate-fadeIn">
+            {/* Header / Info block */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ShieldCheck size={24} style={{ color: '#60a5fa' }} />
+                  Control de Acuses de Recibo de Apoderados
+                </h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13.5px', marginTop: '4px' }}>
+                  Monitoree el consentimiento y firma digital simple de los apoderados sobre la selección académica de los estudiantes.
+                </p>
+              </div>
+
+              <button 
+                onClick={handleExportAcusesExcel}
+                className="laap-btn-success"
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}
+                disabled={acuseRecibos.length === 0}
+              >
+                <FileSpreadsheet size={16} />
+                <span>Exportar Reporte a Excel</span>
+              </button>
+            </div>
+
+            {/* Stats Cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+              <div style={{ backgroundColor: 'var(--bg-card)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-subtle)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', fontWeight: 'bold', textTransform: 'uppercase' }}>Total Solicitados</span>
+                <strong style={{ fontSize: '24px', color: '#60a5fa' }}>{acuseRecibos.length}</strong>
+              </div>
+              <div style={{ backgroundColor: 'var(--bg-card)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-subtle)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', fontWeight: 'bold', textTransform: 'uppercase' }}>Confirmados / Firmados</span>
+                <strong style={{ fontSize: '24px', color: '#10b981' }}>{acuseRecibos.filter(a => a.confirmado).length}</strong>
+              </div>
+              <div style={{ backgroundColor: 'var(--bg-card)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-subtle)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', fontWeight: 'bold', textTransform: 'uppercase' }}>Pendientes</span>
+                <strong style={{ fontSize: '24px', color: '#d97706' }}>{acuseRecibos.filter(a => !a.confirmado).length}</strong>
+              </div>
+              <div style={{ backgroundColor: 'var(--bg-card)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-subtle)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', fontWeight: 'bold', textTransform: 'uppercase' }}>Tasa de Respuesta</span>
+                <strong style={{ fontSize: '24px', color: '#a78bfa' }}>
+                  {acuseRecibos.length > 0 ? Math.round((acuseRecibos.filter(a => a.confirmado).length / acuseRecibos.length) * 100) : 0}%
+                </strong>
+              </div>
+            </div>
+
+            {/* Filter controls */}
+            <div style={{ 
+              display: 'flex', 
+              flexWrap: 'wrap', 
+              gap: '16px', 
+              marginBottom: '20px', 
+              padding: '16px', 
+              backgroundColor: 'rgba(255,255,255,0.02)', 
+              borderRadius: '8px', 
+              border: '1px solid var(--border-color)',
+              alignItems: 'center'
+            }}>
+              {/* Search Bar */}
+              <div style={{ flex: '1 1 300px', position: 'relative' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
+                <input
+                  type="text"
+                  placeholder="Buscar por estudiante, RUT o correo de apoderado..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 36px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    color: 'white',
+                    fontSize: '13.5px'
+                  }}
+                  value={acuseSearchQuery}
+                  onChange={(e) => setAcuseSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {/* Status Select */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '500' }}>Estado:</span>
+                <select
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'rgba(0,0,0,0.2)',
+                    color: 'white',
+                    fontSize: '13.5px',
+                    cursor: 'pointer'
+                  }}
+                  value={acuseFilter}
+                  onChange={(e) => setAcuseFilter(e.target.value)}
+                >
+                  <option value="all">Todos los acuses</option>
+                  <option value="pending">Solo Pendientes</option>
+                  <option value="confirmed">Solo Confirmados</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Data Table */}
+            <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '12px', overflow: 'hidden', boxShadow: 'var(--shadow-subtle)' }}>
+              <div className="table-responsive" style={{ overflowX: 'auto' }}>
+                <table className="laap-admin-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr>
+                      <th>Estudiante / RUT</th>
+                      <th>Curso</th>
+                      <th>Correo Apoderado</th>
+                      <th>Tipo</th>
+                      <th>Estado</th>
+                      <th>Fecha Firma</th>
+                      <th>Info Red</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAcuseRecibos.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
+                          No se encontraron registros de acuse de recibo que coincidan con los filtros.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAcuseRecibos.map((row) => {
+                        const student = students.find(s => s.id === row.alumno_id) || {};
+                        const dateStr = row.confirmado_at ? new Date(row.confirmado_at).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+                        const createdStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL') : '—';
+
+                        return (
+                          <tr key={row.id}>
+                            <td>
+                              <strong>{student.nombre_completo || 'Desconocido'}</strong>
+                              <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontFamily: 'monospace', display: 'block', marginTop: '2px' }}>
+                                RUT: {student.rut || '—'}
+                              </span>
+                            </td>
+                            <td>{student.curso_actual || '—'}</td>
+                            <td>
+                              <span style={{ fontSize: '13px', fontFamily: 'monospace' }}>{row.correo_destinatario}</span>
+                            </td>
+                            <td>
+                              <span style={{ fontSize: '12px', fontWeight: '500', color: row.tipo_confirmacion === 'apoderado_1' ? '#3b82f6' : '#a78bfa' }}>
+                                {row.tipo_confirmacion === 'apoderado_1' ? 'Principal (1)' : 'Secundario (2)'}
+                              </span>
+                            </td>
+                            <td>
+                              <span style={{
+                                display: 'inline-flex',
+                                padding: '4px 8px',
+                                borderRadius: '20px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                backgroundColor: row.confirmado ? 'rgba(16, 185, 129, 0.15)' : 'rgba(217, 119, 6, 0.15)',
+                                color: row.confirmado ? '#10b981' : '#d97706'
+                              }}>
+                                {row.confirmado ? 'Confirmado' : 'Pendiente'}
+                              </span>
+                            </td>
+                            <td>
+                              <div>{dateStr}</div>
+                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Enviado: {createdStr}</span>
+                            </td>
+                            <td>
+                              <div style={{ fontSize: '11px', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={row.user_agent}>
+                                <strong>IP:</strong> {row.ip_address || '—'}
+                              </div>
+                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>UA: {row.user_agent || '—'}</span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 

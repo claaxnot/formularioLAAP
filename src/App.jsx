@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import StudentPortal from './pages/StudentPortal';
 import AdminDashboard from './pages/AdminDashboard';
 import Unauthorized from './pages/Unauthorized';
+import GuardianAcknowledgment from './pages/GuardianAcknowledgment';
 
 // Componente para proteger rutas según rol
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -119,6 +120,9 @@ const AppContent = () => {
             <AdminDashboard />
           </ProtectedRoute>
         } />
+
+        {/* Acuse de recibo de apoderados (Ruta pública) */}
+        <Route path="/acuse/:token" element={<GuardianAcknowledgment />} />
 
         {/* Fallback redirige al Home */}
         <Route path="*" element={<Navigate to="/" replace />} />
