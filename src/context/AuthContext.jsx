@@ -180,7 +180,7 @@ export const AuthProvider = ({ children }) => {
         console.log("[AuthContext] Buscando en administradores...");
         let { data, error } = await withTimeout(
           supabase.from('administradores').select('*').eq('correo', email).eq('activo', true),
-          3500
+          15000
         );
         if (error && (error.code === 'PGRST204' || error.code === '42703')) {
           const fallback = await supabase.from('administradores').select('*').eq('email', email).eq('activo', true);
@@ -210,7 +210,7 @@ export const AuthProvider = ({ children }) => {
         console.log("[AuthContext] Buscando en alumnos...");
         let { data, error } = await withTimeout(
           supabase.from('alumnos').select('*').eq('correo', email),
-          3500
+          15000
         );
         if (error && (error.code === 'PGRST204' || error.code === '42703')) {
           const fallback = await supabase.from('alumnos').select('*').eq('email', email);
@@ -1003,7 +1003,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{ user, role, profile, loading, loginWithGoogle, loginWithEmail, loginAsDemo, logout, showToast, showConfirm }}>
       {children}
       {showTimeoutWarning && renderTimeoutModal()}
-      {authError && renderConnectionErrorModal()}
+      {authError && !window.location.pathname.startsWith('/acuse') && renderConnectionErrorModal()}
       {renderToast()}
       {renderConfirmModal()}
     </AuthContext.Provider>
