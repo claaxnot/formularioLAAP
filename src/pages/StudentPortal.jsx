@@ -1061,7 +1061,9 @@ export default function StudentPortal() {
         <div className="portal-intro-section animate-fadeIn">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
             <h1 style={{ margin: 0 }}>Postulación de Asignaturas Electivas</h1>
-            {getUpdateIndicator()}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              {getUpdateIndicator()}
+            </div>
           </div>
           <p>
             Estimado/a <strong>{formatNombre(profile?.nombre_completo) || 'Estudiante'}</strong> (Curso: <strong>{profile?.curso_actual || '3° Medio'}</strong>), selecciona tus asignaturas electivas para el ciclo académico vigente. Recuerda las siguientes normativas:
