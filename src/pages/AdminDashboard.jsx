@@ -23,7 +23,9 @@ import {
   Upload,
   RefreshCw,
   UploadCloud,
-  ShieldCheck
+  ShieldCheck,
+  Mail,
+  MailX
 } from 'lucide-react';
 
 const getStudentNivelDestino = (curso) => {
@@ -83,6 +85,8 @@ export default function AdminDashboard() {
   const [resetConfirmationText, setResetConfirmationText] = useState('');
   const [resetPreserveElectivos, setResetPreserveElectivos] = useState(true);
   const [isResetting, setIsResetting] = useState(false);
+  const [guardianEmailsEnabled, setGuardianEmailsEnabled] = useState(true);
+  const [togglingGuardianEmails, setTogglingGuardianEmails] = useState(false);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -172,6 +176,11 @@ export default function AdminDashboard() {
         const proc4M = procData?.find(p => p.nivel_destino === '4M' && p.activo === true) || procData?.find(p => p.nivel_destino === '4M') || null;
         setActiveProcess3M(proc3M);
         setActiveProcess4M(proc4M);
+
+        if (procData && procData.length > 0) {
+          const apoderadosActivos = procData.every(p => p.correos_apoderados_activos !== false);
+          setGuardianEmailsEnabled(apoderadosActivos);
+        }
       }
 
       // 8.5. Cargar reservas temporales activas vigentes desde Supabase
@@ -333,6 +342,42 @@ export default function AdminDashboard() {
         }
       }
     );
+  };
+
+  // Alternar activación de correos hacia los apoderados (Manteniendo activo el de los alumnos)
+  const handleToggleGuardianEmails = async () => {
+    const newStatus = !guardianEmailsEnabled;
+    setTogglingGuardianEmails(true);
+    setGuardianEmailsEnabled(newStatus); // Actualización de estado inmediata en la UI
+
+    try {
+      // Actualizar todos los registros de la tabla 'procesos'
+      const { data, error } = await supabase
+        .from('procesos')
+        .update({ correos_apoderados_activos: newStatus })
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+        .select();
+
+      if (error) {
+        console.error("Error al actualizar correos_apoderados_activos:", error);
+        showToast("Error al actualizar estado en Supabase: " + error.message, 'error');
+        setGuardianEmailsEnabled(!newStatus); // Revertir en caso de error
+      } else {
+        showToast(
+          newStatus
+            ? "Correos a apoderados HABILITADOS correctamente."
+            : "Correos a apoderados DESHABILITADOS (Modo Pruebas activado).",
+          newStatus ? 'success' : 'info'
+        );
+        await fetchAdminData(false);
+      }
+    } catch (err) {
+      console.error("Excepción al alternar correos a apoderados:", err);
+      showToast("Error de conexión: " + err.message, 'error');
+      setGuardianEmailsEnabled(!newStatus);
+    } finally {
+      setTogglingGuardianEmails(false);
+    }
   };
   // Lookup Helpers for Client-Side Crossing
   const getAlumnoName = (alumnoId) => {
@@ -2508,6 +2553,109 @@ export default function AdminDashboard() {
                   >
                     <Trash2 size={16} />
                     <span>Iniciar Reinicio de Año Escolar</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD 3: CONTROL DE CORREOS A APODERADOS */}
+              <div style={{
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '24px',
+                boxShadow: 'var(--shadow-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{
+                      backgroundColor: guardianEmailsEnabled ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                      color: guardianEmailsEnabled ? '#10b981' : '#ef4444',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.3s ease'
+                    }}>
+                      {guardianEmailsEnabled ? <Mail size={24} /> : <MailX size={24} />}
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Correos a Apoderados</h3>
+                      <span style={{ 
+                        fontSize: '12px', 
+                        fontWeight: '600',
+                        color: guardianEmailsEnabled ? '#10b981' : '#ef4444' 
+                      }}>
+                        Estado actual: {guardianEmailsEnabled ? 'HABILITADOS (Activo)' : 'DESHABILITADOS (Pruebas)'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <p style={{ fontSize: '13.5px', lineHeight: '1.5', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                    Permite habilitar o deshabilitar el envío automático de correos con acuses de recibo a los apoderados. El envío de comprobantes a los <strong>estudiantes permanecerá siempre activo</strong>.
+                  </p>
+
+                  <div style={{
+                    backgroundColor: guardianEmailsEnabled ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                    border: guardianEmailsEnabled ? '1px solid rgba(16, 185, 129, 0.2)' : '1px solid rgba(245, 158, 11, 0.2)',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    marginBottom: '20px'
+                  }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                      <CheckCircle size={16} style={{ color: guardianEmailsEnabled ? '#10b981' : '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
+                      <div style={{ fontSize: '12px', color: guardianEmailsEnabled ? '#6ee7b7' : '#fcd34d', lineHeight: '1.4' }}>
+                        {guardianEmailsEnabled ? (
+                          <><strong>Envío en producción:</strong> Tanto el estudiante como sus apoderados recibirán los comprobantes al finalizar la postulación.</>
+                        ) : (
+                          <><strong>Modo Pruebas Activo:</strong> Se desactivó el envío a apoderados para realizar pruebas masivas sin enviarles correos. Los estudiantes seguirán recibiendo su comprobante.</>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <button 
+                    onClick={handleToggleGuardianEmails}
+                    disabled={togglingGuardianEmails}
+                    style={{
+                      margin: 0,
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '11px 16px',
+                      borderRadius: '8px',
+                      fontWeight: 'bold',
+                      fontSize: '14px',
+                      cursor: togglingGuardianEmails ? 'wait' : 'pointer',
+                      border: 'none',
+                      transition: 'all 0.2s ease',
+                      backgroundColor: guardianEmailsEnabled ? '#ef4444' : '#10b981',
+                      color: '#ffffff',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                    }}
+                  >
+                    {togglingGuardianEmails ? (
+                      <RefreshCw className="animate-spin" size={16} />
+                    ) : guardianEmailsEnabled ? (
+                      <MailX size={16} />
+                    ) : (
+                      <Mail size={16} />
+                    )}
+                    <span>
+                      {togglingGuardianEmails 
+                        ? 'Guardando cambio...' 
+                        : guardianEmailsEnabled 
+                          ? 'Deshabilitar Correos a Apoderados' 
+                          : 'Habilitar Correos a Apoderados'
+                      }
+                    </span>
                   </button>
                 </div>
               </div>

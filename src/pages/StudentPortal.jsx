@@ -560,6 +560,22 @@ export default function StudentPortal() {
         }));
       }
 
+      // 2.5. Consultar si los correos a apoderados están habilitados en la tabla 'procesos'
+      let enviarApoderados = true;
+      try {
+        const targetNivel = getStudentNivelDestino(stData.curso_actual || profile.curso_actual);
+        const { data: procData } = await supabase
+          .from('procesos')
+          .select('correos_apoderados_activos')
+          .eq('nivel_destino', targetNivel);
+
+        if (procData && procData.length > 0 && procData[0].correos_apoderados_activos === false) {
+          enviarApoderados = false;
+        }
+      } catch (procCheckErr) {
+        console.warn("No se pudo verificar el estado de correos_apoderados_activos:", procCheckErr);
+      }
+
       // 3. Invocar la Edge Function
       const { data: fnData, error: fnErr } = await supabase.functions.invoke('send-confirmation-email', {
         body: {
@@ -570,8 +586,8 @@ export default function StudentPortal() {
           curso_actual: stData.curso_actual || profile.curso_actual,
           nivel_destino: getStudentNivelDestino(stData.curso_actual || profile.curso_actual),
           modalidad: selectedMod,
-          correo_apoderado_1: stData.correo_apoderado_1,
-          correo_apoderado_2: stData.correo_apoderado_2,
+          correo_apoderado_1: enviarApoderados ? stData.correo_apoderado_1 : null,
+          correo_apoderado_2: enviarApoderados ? stData.correo_apoderado_2 : null,
           electivos: electivesPayload
         }
       });
@@ -611,7 +627,12 @@ export default function StudentPortal() {
         .update({ estado_correo: 'enviado' })
         .eq('id', profile.id);
         
-      showToast("¡Respaldo enviado a tu correo institucional y apoderados!", "success");
+      showToast(
+        enviarApoderados
+          ? "¡Respaldo enviado a tu correo institucional y apoderados!"
+          : "¡Respaldo enviado a tu correo institucional! (Correos a apoderados deshabilitados para pruebas)",
+        "success"
+      );
     } catch (err) {
       console.error("Error al enviar correo de confirmación:", err);
       // Registrar estado fallido en base de datos ('error')

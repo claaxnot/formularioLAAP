@@ -421,4 +421,16 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.confirmar_acuse_recibo(TEXT, TEXT, TEXT) TO anon, authenticated;
 
+-- ==========================================================================
+-- ⚡ COLUMNA DE CONTROL DE CORREOS DE APODERADOS EN TABLA PROCESOS
+-- ==========================================================================
+ALTER TABLE public.procesos 
+ADD COLUMN IF NOT EXISTS correos_apoderados_activos BOOLEAN DEFAULT TRUE;
+
+-- Asegurar que los procesos existentes tengan el valor por defecto en true
+UPDATE public.procesos 
+SET correos_apoderados_activos = TRUE 
+WHERE correos_apoderados_activos IS NULL;
+
+
 
