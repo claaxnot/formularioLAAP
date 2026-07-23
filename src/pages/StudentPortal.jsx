@@ -148,115 +148,62 @@ export default function StudentPortal() {
         return;
       }
 
-      // 0. Consultar procesos donde activo = true en Supabase
-      const { data: procData, error: procErr } = await supabase
-        .from('procesos')
-        .select('*')
-        .eq('activo', true)
-        .eq('nivel_destino', targetNivelDestino);
+      // 0. Consultar todo el estado del portal en una sola llamada RPC optimizada (Alta Carga)
+      const { data: portalState, error: portalErr } = await supabase.rpc('obtener_estado_portal_estudiante', {
+        p_alumno_id: profile.id,
+        p_nivel_destino: targetNivelDestino
+      });
 
-      if (procErr) {
-        console.error("Error al consultar tabla procesos:", procErr);
-      }
-      // Si no hay proceso activo o activo = false, bloquear formulario
-      const open = procData && procData.length > 0;
-      setIsProcessOpen(open);
-
-      // 0.5. Consultar modalidad del alumno en Supabase
-      let currentModalidad = null;
-      const isDemo = !!localStorage.getItem('laap_mock_session');
-      try {
-        const { data: modData, error: modErr } = await supabase
-          .from('elecciones_modalidad')
-          .select('*')
-          .eq('alumno_id', profile.id)
-          .maybeSingle();
-
-        if (!modErr) {
-          if (modData) {
-            currentModalidad = modData.modalidad;
-            // Sincronizar caché local con la realidad de la DB
-            localStorage.setItem(`modalidad_${profile.id}`, modData.modalidad);
-          } else {
-            // El registro no existe en la base de datos (fue eliminado por admin o nunca creado)
-            currentModalidad = null;
-            if (!isDemo) {
-              localStorage.removeItem(`modalidad_${profile.id}`);
-            }
-          }
-        } else {
-          // Si hay un error real de red/servidor, recurrir a la caché local como salvaguarda
-          if (modErr.code !== 'PGRST116') {
-            console.error("Error al consultar modalidad en Supabase:", modErr);
-          }
-          const cached = localStorage.getItem(`modalidad_${profile.id}`);
-          if (cached) {
-            currentModalidad = cached;
-          }
-        }
-      } catch (err) {
-        console.error("Excepción al consultar modalidad:", err);
-        const cached = localStorage.getItem(`modalidad_${profile.id}`);
-        if (cached) {
-          currentModalidad = cached;
-        }
-      }
-      setModalidad(currentModalidad);
-
-      // 1. Verificar si el alumno ya tiene postulaciones definitivas en Supabase
-      const { data: postData, error: postErr } = await supabase
-        .from('postulaciones')
-        .select('*, electivos(*)')
-        .eq('alumno_id', profile.id);
-
-      let hasPostulaciones = false;
-      let userSelections = [];
-
-      if (!postErr && postData && postData.length > 0) {
-        hasPostulaciones = true;
-        userSelections = postData;
-      }
-
-      // 1.5. Consultar reservas temporales vigentes del alumno en Supabase
-      const { data: tempReservas, error: tempErr } = await supabase
-        .from('reservas_temporales')
-        .select('*')
-        .eq('alumno_id', profile.id)
-        .gt('expires_at', new Date().toISOString());
-
-      let currentTempReservations = [];
-      if (!tempErr && tempReservas) {
-        currentTempReservations = tempReservas;
-      }
-      setTemporaryReservations(currentTempReservations);
-
-      // 2. Consultar lista de espera del alumno en Supabase
-      const { data: wlData, error: wlErr } = await supabase
-        .from('lista_espera')
-        .select('electivo_id')
-        .eq('alumno_id', profile.id);
-
-      const wlMap = {};
-      if (!wlErr && wlData) {
-        wlData.forEach(item => {
-          wlMap[item.electivo_id] = true;
-        });
-      }
-
-      setWaitlistStatus(wlMap);
-      setAlreadySubmitted(hasPostulaciones);
-      setExistingSelections(userSelections);
-
-      // 3. Cargar Electivos y Cupos reales desde vista_electivos_cupos
-      const { data: cuposData, error: cuposErr } = await supabase
-        .from('vista_electivos_cupos')
-        .select('*');
-
-      if (cuposErr) {
-        setErrorMsg(`Error al obtener electivos: ${cuposErr.message}`);
+      if (portalErr) {
+        console.error("Error al obtener estado del portal:", portalErr);
+        setErrorMsg(`Error al obtener datos: ${portalErr.message}`);
         setLoading(false);
         return;
       }
+
+      // 1. Procesos
+      const procData = portalState.procesos || [];
+      const open = procData.length > 0;
+      setIsProcessOpen(open);
+
+      // 2. Modalidad
+      let currentModalidad = null;
+      const isDemo = !!localStorage.getItem('laap_mock_session');
+      if (portalState.modalidad && portalState.modalidad.modalidad) {
+        currentModalidad = portalState.modalidad.modalidad;
+        localStorage.setItem(`modalidad_${profile.id}`, currentModalidad);
+      } else {
+        if (!isDemo) localStorage.removeItem(`modalidad_${profile.id}`);
+        const cached = localStorage.getItem(`modalidad_${profile.id}`);
+        if (cached) currentModalidad = cached;
+      }
+      setModalidad(currentModalidad);
+
+      // 3. Postulaciones
+      const postData = portalState.postulaciones || [];
+      let hasPostulaciones = false;
+      let userSelections = [];
+      if (postData.length > 0) {
+        hasPostulaciones = true;
+        userSelections = postData;
+      }
+      setAlreadySubmitted(hasPostulaciones);
+      setExistingSelections(userSelections);
+
+      // 4. Reservas temporales
+      const tempReservas = portalState.reservas_temporales || [];
+      setTemporaryReservations(tempReservas);
+
+      // 5. Lista de espera
+      const wlData = portalState.lista_espera || [];
+      const wlMap = {};
+      wlData.forEach(item => {
+        wlMap[item.electivo_id] = true;
+      });
+      setWaitlistStatus(wlMap);
+
+      // 6. Electivos y Cupos
+      const cuposData = portalState.electivos_cupos || [];
 
       // Agrupar horarios dinámicamente según la data real de la vista
       const horariosMap = {};
