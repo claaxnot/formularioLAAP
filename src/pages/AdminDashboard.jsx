@@ -25,7 +25,9 @@ import {
   UploadCloud,
   ShieldCheck,
   Mail,
-  MailX
+  MailX,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 const getStudentNivelDestino = (curso) => {
@@ -87,6 +89,7 @@ export default function AdminDashboard() {
   const [isResetting, setIsResetting] = useState(false);
   const [guardianEmailsEnabled, setGuardianEmailsEnabled] = useState(true);
   const [togglingGuardianEmails, setTogglingGuardianEmails] = useState(false);
+  const [sortConfigElectivos, setSortConfigElectivos] = useState({ key: null, direction: 'asc' });
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -397,6 +400,63 @@ export default function AdminDashboard() {
   const getAlumnoRut = (alumnoId) => {
     const student = students.find(s => s.id === alumnoId);
     return student ? student.rut : '—';
+  };
+
+  const handleSortElectivos = (key) => {
+    let direction = 'asc';
+    if (sortConfigElectivos.key === key && sortConfigElectivos.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfigElectivos({ key, direction });
+  };
+
+  const getSortedElectives = (electivesList) => {
+    if (!sortConfigElectivos.key) return electivesList;
+    return [...electivesList].sort((a, b) => {
+      let aVal = a[sortConfigElectivos.key];
+      let bVal = b[sortConfigElectivos.key];
+      
+      if (sortConfigElectivos.key === 'horario') {
+        aVal = getScheduleName(a.horario_id) || '';
+        bVal = getScheduleName(b.horario_id) || '';
+      } else if (sortConfigElectivos.key === 'area') {
+        aVal = getAreaCode(a.area_id) || '';
+        bVal = getAreaCode(b.area_id) || '';
+      } else if (sortConfigElectivos.key === 'inscritos') {
+        const cupoA = cupos.find(c => c.electivo_id === a.id || c.id === a.id) || {};
+        const cupoB = cupos.find(c => c.electivo_id === b.id || c.id === b.id) || {};
+        aVal = cupoA.cupos_ocupados || 0;
+        bVal = cupoB.cupos_ocupados || 0;
+      } else if (sortConfigElectivos.key === 'vacantes') {
+        const cupoA = cupos.find(c => c.electivo_id === a.id || c.id === a.id) || {};
+        const cupoB = cupos.find(c => c.electivo_id === b.id || c.id === b.id) || {};
+        aVal = cupoA.cupos_disponibles !== undefined ? cupoA.cupos_disponibles : a.cupos_maximos;
+        bVal = cupoB.cupos_disponibles !== undefined ? cupoB.cupos_disponibles : b.cupos_maximos;
+      } else if (sortConfigElectivos.key === 'nombre') {
+        aVal = aVal || '';
+        bVal = bVal || '';
+      } else if (sortConfigElectivos.key === 'docente') {
+        aVal = aVal || 'Docente UTP';
+        bVal = bVal || 'Docente UTP';
+      } else if (sortConfigElectivos.key === 'cupos_maximos') {
+        aVal = aVal || 0;
+        bVal = bVal || 0;
+      }
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        const compareResult = aVal.localeCompare(bVal);
+        if (compareResult !== 0) return sortConfigElectivos.direction === 'asc' ? compareResult : -compareResult;
+      } else {
+        if (aVal < bVal) return sortConfigElectivos.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfigElectivos.direction === 'asc' ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
+  const renderSortIcon = (key) => {
+    if (sortConfigElectivos.key !== key) return null;
+    return sortConfigElectivos.direction === 'asc' ? <ChevronUp size={14} style={{ display: 'inline-block', marginLeft: '4px', verticalAlign: 'middle' }} /> : <ChevronDown size={14} style={{ display: 'inline-block', marginLeft: '4px', verticalAlign: 'middle' }} />;
   };
 
   // Abrir Modal para editar una asignación de electivo individual
@@ -1870,13 +1930,13 @@ export default function AdminDashboard() {
                 <table className="laap-admin-table">
                   <thead>
                     <tr>
-                      <th>Electivo</th>
-                      <th>Profesor/Docente</th>
-                      <th>Horario</th>
-                      <th>Área</th>
-                      <th>Capacidad</th>
-                      <th>Inscritos</th>
-                      <th>Vacantes</th>
+                      <th onClick={() => handleSortElectivos('nombre')} style={{ cursor: 'pointer', userSelect: 'none' }}>Electivo {renderSortIcon('nombre')}</th>
+                      <th onClick={() => handleSortElectivos('docente')} style={{ cursor: 'pointer', userSelect: 'none' }}>Profesor/Docente {renderSortIcon('docente')}</th>
+                      <th onClick={() => handleSortElectivos('horario')} style={{ cursor: 'pointer', userSelect: 'none' }}>Horario {renderSortIcon('horario')}</th>
+                      <th onClick={() => handleSortElectivos('area')} style={{ cursor: 'pointer', userSelect: 'none' }}>Área {renderSortIcon('area')}</th>
+                      <th onClick={() => handleSortElectivos('cupos_maximos')} style={{ cursor: 'pointer', userSelect: 'none' }}>Capacidad {renderSortIcon('cupos_maximos')}</th>
+                      <th onClick={() => handleSortElectivos('inscritos')} style={{ cursor: 'pointer', userSelect: 'none' }}>Inscritos {renderSortIcon('inscritos')}</th>
+                      <th onClick={() => handleSortElectivos('vacantes')} style={{ cursor: 'pointer', userSelect: 'none' }}>Vacantes {renderSortIcon('vacantes')}</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
@@ -1886,8 +1946,7 @@ export default function AdminDashboard() {
                         <td colSpan="8" style={{ textAlign: 'center', padding: '24px' }}>No hay registros para 3° Medio.</td>
                       </tr>
                     ) : (
-                      electives
-                        .filter(e => e.nivel_destino === '3M')
+                      getSortedElectives(electives.filter(e => e.nivel_destino === '3M'))
                         .map(el => {
                           const cupoDetail = cupos.find(c => c.electivo_id === el.id || c.id === el.id) || {};
                           const cuposOcupados = cupoDetail.cupos_ocupados || 0;
@@ -1949,13 +2008,13 @@ export default function AdminDashboard() {
                 <table className="laap-admin-table">
                   <thead>
                     <tr>
-                      <th>Electivo</th>
-                      <th>Profesor/Docente</th>
-                      <th>Horario</th>
-                      <th>Área</th>
-                      <th>Capacidad</th>
-                      <th>Inscritos</th>
-                      <th>Vacantes</th>
+                      <th onClick={() => handleSortElectivos('nombre')} style={{ cursor: 'pointer', userSelect: 'none' }}>Electivo {renderSortIcon('nombre')}</th>
+                      <th onClick={() => handleSortElectivos('docente')} style={{ cursor: 'pointer', userSelect: 'none' }}>Profesor/Docente {renderSortIcon('docente')}</th>
+                      <th onClick={() => handleSortElectivos('horario')} style={{ cursor: 'pointer', userSelect: 'none' }}>Horario {renderSortIcon('horario')}</th>
+                      <th onClick={() => handleSortElectivos('area')} style={{ cursor: 'pointer', userSelect: 'none' }}>Área {renderSortIcon('area')}</th>
+                      <th onClick={() => handleSortElectivos('cupos_maximos')} style={{ cursor: 'pointer', userSelect: 'none' }}>Capacidad {renderSortIcon('cupos_maximos')}</th>
+                      <th onClick={() => handleSortElectivos('inscritos')} style={{ cursor: 'pointer', userSelect: 'none' }}>Inscritos {renderSortIcon('inscritos')}</th>
+                      <th onClick={() => handleSortElectivos('vacantes')} style={{ cursor: 'pointer', userSelect: 'none' }}>Vacantes {renderSortIcon('vacantes')}</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
@@ -1965,8 +2024,7 @@ export default function AdminDashboard() {
                         <td colSpan="8" style={{ textAlign: 'center', padding: '24px' }}>No hay registros para 4° Medio.</td>
                       </tr>
                     ) : (
-                      electives
-                        .filter(e => e.nivel_destino === '4M')
+                      getSortedElectives(electives.filter(e => e.nivel_destino === '4M'))
                         .map(el => {
                           const cupoDetail = cupos.find(c => c.electivo_id === el.id || c.id === el.id) || {};
                           const cuposOcupados = cupoDetail.cupos_ocupados || 0;
