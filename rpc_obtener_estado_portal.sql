@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.obtener_estado_portal_estudiante(
 )
 RETURNS JSONB
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 AS $$
 DECLARE
     v_procesos JSONB;
