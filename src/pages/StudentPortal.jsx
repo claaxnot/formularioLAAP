@@ -267,7 +267,7 @@ export default function StudentPortal() {
           }
         });
       } else {
-        currentTempReservations.forEach(r => {
+        tempReservas.forEach(r => {
           const matchedEl = allElectives.find(e => e.id === r.electivo_id);
           if (matchedEl) {
             selectionsMap[matchedEl.horario_nombre] = matchedEl;
@@ -277,8 +277,8 @@ export default function StudentPortal() {
       setSelectedElectives(selectionsMap);
 
       // Sincronizar temporizador de expiración de la reserva
-      if (!hasPostulaciones && currentTempReservations.length > 0) {
-        const expDates = currentTempReservations.map(r => new Date(r.expires_at).getTime());
+      if (!hasPostulaciones && tempReservas.length > 0) {
+        const expDates = tempReservas.map(r => new Date(r.expires_at).getTime());
         const minExpiry = Math.min(...expDates);
         setReservationExpiry(minExpiry);
       } else {
