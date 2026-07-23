@@ -685,7 +685,6 @@ export default function Login() {
         {/* Footer Institucional */}
         <div className="laap-login-footer">
           <p>© 2026 Liceo Arturo Alessandri Palma. Todos los derechos reservados.</p>
-          <p>Para soporte o consultas técnicas, escribir a <strong>cvidal@liceoalessandri.cl</strong></p>
         </div>
 
       </div>
