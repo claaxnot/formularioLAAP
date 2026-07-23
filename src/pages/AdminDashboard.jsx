@@ -89,7 +89,7 @@ export default function AdminDashboard() {
   const [isResetting, setIsResetting] = useState(false);
   const [guardianEmailsEnabled, setGuardianEmailsEnabled] = useState(true);
   const [togglingGuardianEmails, setTogglingGuardianEmails] = useState(false);
-  const [sortConfigElectivos, setSortConfigElectivos] = useState({ key: null, direction: 'asc' });
+  const [sortConfigElectivos, setSortConfigElectivos] = useState([]);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
@@ -403,60 +403,87 @@ export default function AdminDashboard() {
   };
 
   const handleSortElectivos = (key) => {
-    let direction = 'asc';
-    if (sortConfigElectivos.key === key && sortConfigElectivos.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfigElectivos({ key, direction });
+    setSortConfigElectivos(prev => {
+      const existingIndex = prev.findIndex(item => item.key === key);
+      let newConfig = [...prev];
+      
+      if (existingIndex === 0) {
+        newConfig[0] = { key, direction: newConfig[0].direction === 'asc' ? 'desc' : 'asc' };
+      } else if (existingIndex > 0) {
+        newConfig.splice(existingIndex, 1);
+        newConfig.unshift({ key, direction: 'asc' });
+      } else {
+        newConfig.unshift({ key, direction: 'asc' });
+      }
+      
+      return newConfig.slice(0, 2); // Limitar a doble ordenamiento
+    });
   };
 
   const getSortedElectives = (electivesList) => {
-    if (!sortConfigElectivos.key) return electivesList;
+    if (sortConfigElectivos.length === 0) return electivesList;
     return [...electivesList].sort((a, b) => {
-      let aVal = a[sortConfigElectivos.key];
-      let bVal = b[sortConfigElectivos.key];
-      
-      if (sortConfigElectivos.key === 'horario') {
-        aVal = getScheduleName(a.horario_id) || '';
-        bVal = getScheduleName(b.horario_id) || '';
-      } else if (sortConfigElectivos.key === 'area') {
-        aVal = getAreaCode(a.area_id) || '';
-        bVal = getAreaCode(b.area_id) || '';
-      } else if (sortConfigElectivos.key === 'inscritos') {
-        const cupoA = cupos.find(c => c.electivo_id === a.id || c.id === a.id) || {};
-        const cupoB = cupos.find(c => c.electivo_id === b.id || c.id === b.id) || {};
-        aVal = cupoA.cupos_ocupados || 0;
-        bVal = cupoB.cupos_ocupados || 0;
-      } else if (sortConfigElectivos.key === 'vacantes') {
-        const cupoA = cupos.find(c => c.electivo_id === a.id || c.id === a.id) || {};
-        const cupoB = cupos.find(c => c.electivo_id === b.id || c.id === b.id) || {};
-        aVal = cupoA.cupos_disponibles !== undefined ? cupoA.cupos_disponibles : a.cupos_maximos;
-        bVal = cupoB.cupos_disponibles !== undefined ? cupoB.cupos_disponibles : b.cupos_maximos;
-      } else if (sortConfigElectivos.key === 'nombre') {
-        aVal = aVal || '';
-        bVal = bVal || '';
-      } else if (sortConfigElectivos.key === 'docente') {
-        aVal = aVal || 'Docente UTP';
-        bVal = bVal || 'Docente UTP';
-      } else if (sortConfigElectivos.key === 'cupos_maximos') {
-        aVal = aVal || 0;
-        bVal = bVal || 0;
-      }
+      for (const config of sortConfigElectivos) {
+        let aVal = a[config.key];
+        let bVal = b[config.key];
+        
+        if (config.key === 'horario') {
+          aVal = getScheduleName(a.horario_id) || '';
+          bVal = getScheduleName(b.horario_id) || '';
+        } else if (config.key === 'area') {
+          aVal = getAreaCode(a.area_id) || '';
+          bVal = getAreaCode(b.area_id) || '';
+        } else if (config.key === 'inscritos') {
+          const cupoA = cupos.find(c => c.electivo_id === a.id || c.id === a.id) || {};
+          const cupoB = cupos.find(c => c.electivo_id === b.id || c.id === b.id) || {};
+          aVal = cupoA.cupos_ocupados || 0;
+          bVal = cupoB.cupos_ocupados || 0;
+        } else if (config.key === 'vacantes') {
+          const cupoA = cupos.find(c => c.electivo_id === a.id || c.id === a.id) || {};
+          const cupoB = cupos.find(c => c.electivo_id === b.id || c.id === b.id) || {};
+          aVal = cupoA.cupos_disponibles !== undefined ? cupoA.cupos_disponibles : a.cupos_maximos;
+          bVal = cupoB.cupos_disponibles !== undefined ? cupoB.cupos_disponibles : b.cupos_maximos;
+        } else if (config.key === 'nombre') {
+          aVal = aVal || '';
+          bVal = bVal || '';
+        } else if (config.key === 'docente') {
+          aVal = aVal || 'Docente UTP';
+          bVal = bVal || 'Docente UTP';
+        } else if (config.key === 'cupos_maximos') {
+          aVal = aVal || 0;
+          bVal = bVal || 0;
+        }
 
-      if (typeof aVal === 'string' && typeof bVal === 'string') {
-        const compareResult = aVal.localeCompare(bVal);
-        if (compareResult !== 0) return sortConfigElectivos.direction === 'asc' ? compareResult : -compareResult;
-      } else {
-        if (aVal < bVal) return sortConfigElectivos.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfigElectivos.direction === 'asc' ? 1 : -1;
+        let result = 0;
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+          const compareResult = aVal.localeCompare(bVal);
+          if (compareResult !== 0) result = config.direction === 'asc' ? compareResult : -compareResult;
+        } else {
+          if (aVal < bVal) result = config.direction === 'asc' ? -1 : 1;
+          else if (aVal > bVal) result = config.direction === 'asc' ? 1 : -1;
+        }
+        
+        if (result !== 0) return result;
       }
-      return 0;
+      return 0; // Si hay empate en todos los niveles, mantener orden original
     });
   };
 
   const renderSortIcon = (key) => {
-    if (sortConfigElectivos.key !== key) return null;
-    return sortConfigElectivos.direction === 'asc' ? <ChevronUp size={14} style={{ display: 'inline-block', marginLeft: '4px', verticalAlign: 'middle' }} /> : <ChevronDown size={14} style={{ display: 'inline-block', marginLeft: '4px', verticalAlign: 'middle' }} />;
+    const sortItem = sortConfigElectivos.find(item => item.key === key);
+    if (!sortItem) return null;
+    
+    const isPrimary = sortConfigElectivos[0]?.key === key;
+    const badge = (sortConfigElectivos.length > 1 && !isPrimary) 
+      ? <small style={{fontSize: '9px', marginLeft: '2px', opacity: 0.7}}>2</small> 
+      : null;
+      
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: '4px', verticalAlign: 'middle' }}>
+        {sortItem.direction === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        {badge}
+      </span>
+    );
   };
 
   // Abrir Modal para editar una asignación de electivo individual
