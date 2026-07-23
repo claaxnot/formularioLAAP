@@ -2384,6 +2384,26 @@ export default function AdminDashboard() {
           // KPIs
           const totalCH = eleccionesModalidad.filter(m => m.modalidad === 'cientifico_humanista').length;
           const totalTP = eleccionesModalidad.filter(m => m.modalidad === 'tecnico_profesional_gastronomia').length;
+          const tpStudentsList = eleccionesModalidad.filter(m => m.modalidad === 'tecnico_profesional_gastronomia');
+
+          const handleExportModalidadTP = () => {
+            const exportData = tpStudentsList.map(row => {
+              const st = students.find(s => s.id === row.alumno_id) || {};
+              const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+              return {
+                "RUT": st.rut || '—',
+                "Nombre": st.nombre_completo || 'Desconocido',
+                "Curso": st.curso_actual || '—',
+                "Correo": st.correo || '—',
+                "Modalidad": "Técnico Profesional (Gastronomía)",
+                "Fecha de Selección": dateStr
+              };
+            });
+            const ws = XLSX.utils.json_to_sheet(exportData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Nómina TP");
+            XLSX.writeFile(wb, "nomina_estudiantes_tp.xlsx");
+          };
 
           return (
             <div className="animate-fadeIn">
@@ -2435,8 +2455,12 @@ export default function AdminDashboard() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
                   <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-                    Listado de Estudiantes por Modalidad
+                    Listado de Estudiantes TP (Gastronomía)
                   </h3>
+                  <button className="laap-btn-primary" onClick={handleExportModalidadTP}>
+                    <FileSpreadsheet size={16} />
+                    <span>Exportar Nómina TP</span>
+                  </button>
                 </div>
 
                 <div className="table-responsive">
@@ -2451,19 +2475,18 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {eleccionesModalidad.length === 0 ? (
+                      {tpStudentsList.length === 0 ? (
                         <tr>
                           <td colSpan="5" style={{ textAlign: 'center', padding: '32px', color: 'var(--text-secondary)' }}>
-                            No hay registros de modalidad registrados aún.
+                            No hay registros de modalidad TP registrados aún.
                           </td>
                         </tr>
                       ) : (
-                        eleccionesModalidad.map((row, idx) => {
+                        tpStudentsList.map((row, idx) => {
                           const st = students.find(s => s.id === row.alumno_id) || {};
-                          const isTP = row.modalidad === 'tecnico_profesional_gastronomia';
-                          const modLabel = isTP ? 'Técnico Profesional (Gastronomía)' : 'Científico Humanista';
-                          const badgeColor = isTP ? 'rgba(16, 185, 129, 0.15)' : 'rgba(59, 130, 246, 0.15)';
-                          const badgeText = isTP ? '#10b981' : '#3b82f6';
+                          const modLabel = 'Técnico Profesional (Gastronomía)';
+                          const badgeColor = 'rgba(16, 185, 129, 0.15)';
+                          const badgeText = '#10b981';
                           const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
                           return (
