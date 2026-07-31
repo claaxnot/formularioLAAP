@@ -237,32 +237,34 @@ SECURITY DEFINER -- Ejecuta con privilegios elevados para limpiar tablas
 AS $$
 BEGIN
     -- 1. Limpiar reservas temporales
-    DELETE FROM public.reservas_temporales;
+    DELETE FROM public.reservas_temporales WHERE id IS NOT NULL;
 
     -- 2. Limpiar postulaciones
-    DELETE FROM public.postulaciones;
+    DELETE FROM public.postulaciones WHERE id IS NOT NULL;
 
     -- 3. Limpiar lista de espera
-    DELETE FROM public.lista_espera;
+    DELETE FROM public.lista_espera WHERE id IS NOT NULL;
 
     -- 4. Limpiar elecciones de modalidad
-    DELETE FROM public.elecciones_modalidad;
+    DELETE FROM public.elecciones_modalidad WHERE id IS NOT NULL;
 
     -- 5. Limpiar acuses de recibo de apoderados
-    DELETE FROM public.acuse_recibo_apoderados;
+    DELETE FROM public.acuse_recibo_apoderados WHERE id IS NOT NULL;
 
     -- 6. Resetear columnas de estudiantes
     UPDATE public.alumnos 
     SET ya_postulo = FALSE, 
-        estado_correo = 'pendiente';
+        estado_correo = 'pendiente'
+    WHERE id IS NOT NULL;
 
     -- 7. Poner todos los procesos en inactivos (activo = false)
     UPDATE public.procesos 
-    SET activo = FALSE;
+    SET activo = FALSE
+    WHERE id IS NOT NULL;
 
     -- 8. Limpiar electivos si se solicitó
     IF p_limpiar_electivos = TRUE THEN
-        DELETE FROM public.electivos;
+        DELETE FROM public.electivos WHERE id IS NOT NULL;
     END IF;
 
     RETURN jsonb_build_object(
