@@ -301,6 +301,7 @@ CREATE TABLE IF NOT EXISTS public.acuse_recibo_apoderados (
 ALTER TABLE public.acuse_recibo_apoderados ENABLE ROW LEVEL SECURITY;
 
 -- Permitir a administradores realizar cualquier acción
+DROP POLICY IF EXISTS "Admins full control on acuse" ON public.acuse_recibo_apoderados;
 CREATE POLICY "Admins full control on acuse"
 ON public.acuse_recibo_apoderados
 FOR ALL
