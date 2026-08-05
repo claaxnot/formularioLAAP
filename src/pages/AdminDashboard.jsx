@@ -1989,10 +1989,15 @@ export default function AdminDashboard() {
                         // Buscar la postulación actual del alumno en ese horario
                         const currentPostulacion = postulaciones.find(p => p.alumno_id === w.alumno_id && String(p.horario_id) === String(targetHorarioId));
                         let currentElectiveName = "Ninguno (No postulado aún)";
+                        let currentElectiveArea = "";
                         if (currentPostulacion) {
                           const ce = electives.find(e => e.id === currentPostulacion.electivo_id);
-                          if (ce) currentElectiveName = ce.nombre;
+                          if (ce) {
+                            currentElectiveName = ce.nombre;
+                            currentElectiveArea = getAreaCode(ce.area_id);
+                          }
                         }
+                        const matchedElectiveArea = getAreaCode(matchedElective.area_id);
 
                         return (
                           <tr key={w.id}>
@@ -2020,7 +2025,9 @@ export default function AdminDashboard() {
                                         horario_nombre: getScheduleName(targetHorarioId || 1),
                                         nuevo_electivo_id: w.electivo_id,
                                         nuevo_electivo_nombre: getElectiveName(w.electivo_id),
-                                        electivo_actual_nombre: currentElectiveName
+                                        nuevo_electivo_area: matchedElectiveArea,
+                                        electivo_actual_nombre: currentElectiveName,
+                                        electivo_actual_area: currentElectiveArea
                                       });
                                       setShowWaitlistModal(true);
                                     } catch (err) {
@@ -3580,11 +3587,17 @@ export default function AdminDashboard() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
                   <div style={{ backgroundColor: '#fee2e2', padding: '12px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
                     <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#991b1b', fontWeight: 'bold' }}>Electivo Actual (Se liberará cupo)</p>
-                    <p style={{ margin: 0, color: '#7f1d1d' }}>{waitlistAssignData.electivo_actual_nombre}</p>
+                    <p style={{ margin: 0, color: '#7f1d1d' }}>
+                      {waitlistAssignData.electivo_actual_nombre}
+                      {waitlistAssignData.electivo_actual_area && <span style={{ fontSize: '12px', fontStyle: 'italic', marginLeft: '6px', opacity: 0.8 }}>(Área {waitlistAssignData.electivo_actual_area})</span>}
+                    </p>
                   </div>
                   <div style={{ backgroundColor: '#dcfce7', padding: '12px', borderRadius: '6px', border: '1px solid #86efac' }}>
                     <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#166534', fontWeight: 'bold' }}>Nuevo Electivo (Lista Espera)</p>
-                    <p style={{ margin: 0, color: '#14532d' }}>{waitlistAssignData.nuevo_electivo_nombre}</p>
+                    <p style={{ margin: 0, color: '#14532d' }}>
+                      {waitlistAssignData.nuevo_electivo_nombre}
+                      {waitlistAssignData.nuevo_electivo_area && <span style={{ fontSize: '12px', fontStyle: 'italic', marginLeft: '6px', opacity: 0.8 }}>(Área {waitlistAssignData.nuevo_electivo_area})</span>}
+                    </p>
                   </div>
                 </div>
                 
