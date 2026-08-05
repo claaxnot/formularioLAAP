@@ -629,6 +629,7 @@ export default function AdminDashboard() {
         nombre_completo: st.nombre_completo,
         rut: st.rut,
         curso_actual: st.curso_actual,
+        nivel_destino: (st.curso_actual && st.curso_actual.startsWith('2')) ? '3M' : '4M',
         modalidad: modalidad,
         correo_apoderado_1: st.correo_apoderado_1,
         correo_apoderado_2: st.correo_apoderado_2,
@@ -640,8 +641,22 @@ export default function AdminDashboard() {
       });
 
       if (error || (data && !data.success)) {
-        console.error("Detalle del error de reenvío en Edge Function:", error || data);
-        throw new Error(error?.message || data?.error || 'Error desconocido al reenviar. Ver consola.');
+        let errorMsg = error?.message || data?.error || 'Error desconocido al reenviar.';
+        
+        // Extraer mensaje real de Resend desde el response body si existe
+        if (error && error.context) {
+          try {
+            const bodyText = await error.context.text();
+            const bodyJson = JSON.parse(bodyText);
+            errorMsg = bodyJson.error || errorMsg;
+            if (bodyJson.details) errorMsg += ` - Detalle: ${bodyJson.details}`;
+          } catch (e) {
+            // ignorar si no se puede parsear
+          }
+        }
+        
+        console.error("Detalle del error de reenvío en Edge Function:", errorMsg);
+        throw new Error(errorMsg);
       }
 
       await supabase.from('alumnos').update({ estado_correo: 'enviado' }).eq('id', st.id);
