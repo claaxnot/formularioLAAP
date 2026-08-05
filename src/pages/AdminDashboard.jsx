@@ -3613,11 +3613,14 @@ export default function AdminDashboard() {
                       {sorted.map(p => {
                         const el = electives.find(e => e.id === p.electivo_id);
                         const hor = horarios.find(h => String(h.id) === String(p.horario_id));
+                        const area = el ? areas.find(a => a.id === el.area_id) : null;
+                        const areaName = area ? `Área ${area.codigo}` : '';
                         const isTheOneChanging = String(p.horario_id) === String(waitlistAssignData.horario_id);
                         
                         return (
                           <li key={p.id} style={{ marginBottom: '4px', color: isTheOneChanging ? '#ef4444' : 'inherit', textDecoration: isTheOneChanging ? 'line-through' : 'none' }}>
-                            <strong>{hor ? hor.nombre : `Bloque ${p.horario_id}`}:</strong> {el ? el.nombre : 'Desconocido'}
+                            <strong>{hor ? hor.nombre : `Bloque ${p.horario_id}`}:</strong> {el ? el.nombre : 'Desconocido'} 
+                            {areaName && <span style={{ fontSize: '11px', color: isTheOneChanging ? '#ef4444' : '#64748b', fontStyle: 'italic', marginLeft: '6px' }}>({areaName})</span>}
                             {isTheOneChanging && <span style={{ marginLeft: '8px', fontSize: '11px', backgroundColor: '#fee2e2', color: '#991b1b', padding: '2px 6px', borderRadius: '4px', textDecoration: 'none', display: 'inline-block' }}>Se liberará</span>}
                           </li>
                         );
