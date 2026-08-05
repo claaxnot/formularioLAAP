@@ -2055,7 +2055,7 @@ export default function AdminDashboard() {
                             <td>{getAlumnoCurso(w.alumno_id)}</td>
                             <td><strong>{getElectiveName(w.electivo_id)}</strong></td>
                             <td>{getScheduleName(targetHorarioId || 1)}</td>
-                            <td>{new Date(w.created_at).toLocaleString('es-CL')}</td>
+                            <td>{new Date(w.created_at.endsWith('Z') || w.created_at.includes('+') ? w.created_at : w.created_at + 'Z').toLocaleString('es-CL')}</td>
                             <td>
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                 <button
