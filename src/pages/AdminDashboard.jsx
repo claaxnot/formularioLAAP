@@ -1964,30 +1964,43 @@ export default function AdminDashboard() {
                     <option value="all">Ver todas las asignaturas</option>
                     {(() => {
                       const sorted = [...electives].sort((a, b) => {
-                        // 1. Horario (orden)
+                        // 1. Nivel Destino (3M primero)
+                        if (a.nivel_destino !== b.nivel_destino) return a.nivel_destino.localeCompare(b.nivel_destino);
+                        // 2. Horario (orden)
                         const hA = horarios.find(h => String(h.id) === String(a.horario_id))?.orden || 0;
                         const hB = horarios.find(h => String(h.id) === String(b.horario_id))?.orden || 0;
                         if (hA !== hB) return hA - hB;
-                        // 2. Area
+                        // 3. Area
                         const areaA = areas.find(ar => ar.id === a.area_id)?.nombre || '';
                         const areaB = areas.find(ar => ar.id === b.area_id)?.nombre || '';
                         if (areaA.localeCompare(areaB) !== 0) return areaA.localeCompare(areaB);
-                        // 3. Nivel Destino
-                        if (a.nivel_destino !== b.nivel_destino) return a.nivel_destino.localeCompare(b.nivel_destino);
                         // 4. Nombre
                         return a.nombre.localeCompare(b.nombre);
                       });
                       
-                      return sorted.map(el => {
-                        const hor = horarios.find(h => String(h.id) === String(el.horario_id));
-                        const hName = hor ? hor.nombre : `H${el.horario_id}`;
-                        const areaCode = getAreaCode(el.area_id);
-                        return (
-                          <option key={el.id} value={el.id}>
-                            [{hName} - Área {areaCode}] {el.nombre} ({el.nivel_destino})
-                          </option>
-                        );
-                      });
+                      const renderGroup = (nivel) => {
+                        return sorted.filter(e => e.nivel_destino === nivel).map(el => {
+                          const hor = horarios.find(h => String(h.id) === String(el.horario_id));
+                          const hName = hor ? hor.nombre : `H${el.horario_id}`;
+                          const areaCode = getAreaCode(el.area_id);
+                          return (
+                            <option key={el.id} value={el.id}>
+                              [{hName} - Área {areaCode}] {el.nombre}
+                            </option>
+                          );
+                        });
+                      };
+
+                      return (
+                        <>
+                          <optgroup label="Asignaturas 3° Medio">
+                            {renderGroup('3M')}
+                          </optgroup>
+                          <optgroup label="Asignaturas 4° Medio">
+                            {renderGroup('4M')}
+                          </optgroup>
+                        </>
+                      );
                     })()}
                   </select>
                 </div>
