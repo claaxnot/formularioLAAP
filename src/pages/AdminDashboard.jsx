@@ -62,6 +62,7 @@ export default function AdminDashboard() {
   const [activeProcess4M, setActiveProcess4M] = useState(null);
   const [lastUpdated, setLastUpdated] = useState('');
   const [statsFilter, setStatsFilter] = useState('all'); // 'all', '3M', '4M'
+  const [waitlistFilter, setWaitlistFilter] = useState('all'); // 'all', o id_electivo
   const [acuseRecibos, setAcuseRecibos] = useState([]);
   const [acuseFilter, setAcuseFilter] = useState('all'); // 'all', 'pending', 'confirmed'
   const [acuseSearchQuery, setAcuseSearchQuery] = useState('');
@@ -94,6 +95,12 @@ export default function AdminDashboard() {
   // Modal State
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState('create'); // 'create' or 'edit'
+
+  // Modal de Asignación Lista de Espera
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false);
+  const [waitlistAssignData, setWaitlistAssignData] = useState(null);
+  const [isAssigningWaitlist, setIsAssigningWaitlist] = useState(false);
+
   const [currentElective, setCurrentElective] = useState({
     id: null,
     nombre: '',
@@ -725,6 +732,29 @@ export default function AdminDashboard() {
       nivel_destino: el.nivel_destino ?? "3M"
     });
     setShowModal(true);
+  };
+
+  const handleAssignWaitlist = async () => {
+    if (!waitlistAssignData) return;
+    setIsAssigningWaitlist(true);
+    try {
+      const { data, error } = await supabase.rpc('asignar_cupo_lista_espera', {
+        p_espera_id: waitlistAssignData.waitlist_id,
+        p_alumno_id: waitlistAssignData.alumno_id,
+        p_nuevo_electivo_id: waitlistAssignData.nuevo_electivo_id,
+        p_horario_id: waitlistAssignData.horario_id
+      });
+      if (error) throw error;
+      if (data && !data.success) throw new Error(data.message);
+      
+      showToast("Cupo reasignado (sobrecupo aplicado) correctamente.", "success");
+      setShowWaitlistModal(false);
+      await fetchAdminData(false);
+    } catch (err) {
+      alert("Error al asignar cupo: " + err.message);
+    } finally {
+      setIsAssigningWaitlist(false);
+    }
   };
 
   // Exportar reporte de Roster por nivel (3M o 4M) a formato Excel (.xlsx) con múltiples pestañas
@@ -1908,8 +1938,27 @@ export default function AdminDashboard() {
         {activeTab === 'lista_espera' && (
           <div className="admin-tab-content animate-fadeIn">
             <div className="admin-section-card">
-              <h2>Alumnos Registrados en Lista de Espera</h2>
-              <p>Seguimiento de estudiantes en cola de espera por falta de vacante.</p>
+              <div className="card-filter-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '20px' }}>
+                <div>
+                  <h2>Alumnos Registrados en Lista de Espera</h2>
+                  <p style={{ margin: 0 }}>Seguimiento de estudiantes en cola de espera por falta de vacante.</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <label htmlFor="waitlistFilter" style={{ fontWeight: 'bold' }}>Filtrar por Asignatura:</label>
+                  <select
+                    id="waitlistFilter"
+                    className="laap-input"
+                    value={waitlistFilter}
+                    onChange={(e) => setWaitlistFilter(e.target.value)}
+                    style={{ width: '250px' }}
+                  >
+                    <option value="all">Ver todas las asignaturas</option>
+                    {electives.map(el => (
+                      <option key={el.id} value={el.id}>{el.nombre} ({el.nivel_destino})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
               <div className="table-responsive">
                 <table className="laap-admin-table">
@@ -1924,13 +1973,27 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {waitlist.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>No hay registros disponibles.</td>
-                      </tr>
-                    ) : (
-                      waitlist.map(w => {
+                    {(() => {
+                      const filteredWaitlist = waitlistFilter === 'all' ? waitlist : waitlist.filter(w => String(w.electivo_id) === String(waitlistFilter));
+                      if (filteredWaitlist.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan="6" style={{ textAlign: 'center', padding: '24px' }}>No hay registros disponibles.</td>
+                          </tr>
+                        );
+                      }
+                      return filteredWaitlist.map(w => {
                         const matchedElective = electives.find(e => e.id === w.electivo_id) || {};
+                        const targetHorarioId = matchedElective.horario_id;
+                        
+                        // Buscar la postulación actual del alumno en ese horario
+                        const currentPostulacion = postulaciones.find(p => p.alumno_id === w.alumno_id && String(p.horario_id) === String(targetHorarioId));
+                        let currentElectiveName = "Ninguno (No postulado aún)";
+                        if (currentPostulacion) {
+                          const ce = electives.find(e => e.id === currentPostulacion.electivo_id);
+                          if (ce) currentElectiveName = ce.nombre;
+                        }
+
                         return (
                           <tr key={w.id}>
                             <td>
@@ -1940,31 +2003,51 @@ export default function AdminDashboard() {
                             </td>
                             <td>{getAlumnoCurso(w.alumno_id)}</td>
                             <td><strong>{getElectiveName(w.electivo_id)}</strong></td>
-                            <td>{getScheduleName(matchedElective.horario_id || 1)}</td>
+                            <td>{getScheduleName(targetHorarioId || 1)}</td>
                             <td>{new Date(w.created_at).toLocaleString('es-CL')}</td>
                             <td>
-                              <button
-                                className="btn-table-danger"
-                                onClick={async () => {
-                                  if (window.confirm("¿Retirar de la lista de espera?")) {
-                                    const { error } = await supabase.from('lista_espera').delete().eq('id', w.id);
-                                    if (error) {
-                                      alert("Error: " + error.message);
-                                    } else {
-                                      alert("Retirado.");
-                                      await fetchAdminData(false);
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <button
+                                  className="btn-table-action"
+                                  onClick={() => {
+                                    setWaitlistAssignData({
+                                      waitlist_id: w.id,
+                                      alumno_id: w.alumno_id,
+                                      alumno_nombre: getAlumnoName(w.alumno_id),
+                                      horario_id: targetHorarioId,
+                                      horario_nombre: getScheduleName(targetHorarioId || 1),
+                                      nuevo_electivo_id: w.electivo_id,
+                                      nuevo_electivo_nombre: getElectiveName(w.electivo_id),
+                                      electivo_actual_nombre: currentElectiveName
+                                    });
+                                    setShowWaitlistModal(true);
+                                  }}
+                                  style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
+                                >
+                                  Asignar Cupo
+                                </button>
+                                <button
+                                  className="btn-table-danger"
+                                  onClick={async () => {
+                                    if (window.confirm("¿Retirar de la lista de espera?")) {
+                                      const { error } = await supabase.from('lista_espera').delete().eq('id', w.id);
+                                      if (error) {
+                                        alert("Error: " + error.message);
+                                      } else {
+                                        showToast("Retirado correctamente.", "success");
+                                        await fetchAdminData(false);
+                                      }
                                     }
-                                  }
-                                }}
-                              >
-                                <Trash2 size={14} />
-                                <span>Retirar</span>
-                              </button>
+                                  }}
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
-                      })
-                    )}
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>

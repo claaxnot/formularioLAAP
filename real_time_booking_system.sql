@@ -436,4 +436,53 @@ SET correos_apoderados_activos = TRUE
 WHERE correos_apoderados_activos IS NULL;
 
 
+-- ==========================================================================
+-- 7. FUNCIÓN RPC: asignar_cupo_lista_espera (ADMIN OVERRIDE)
+-- ==========================================================================
+CREATE OR REPLACE FUNCTION public.asignar_cupo_lista_espera(
+    p_espera_id UUID,
+    p_alumno_id UUID,
+    p_nuevo_electivo_id UUID,
+    p_horario_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER -- Se necesita para sobreescribir RLS en postulaciones y lista_espera
+AS $$
+BEGIN
+    -- Validar que sea un administrador activo quien ejecuta esto
+    IF NOT EXISTS (
+        SELECT 1 FROM public.administradores 
+        WHERE correo = auth.jwt()->>'email' AND activo = true
+    ) THEN
+        RETURN jsonb_build_object('success', false, 'message', 'Acceso denegado. Solo administradores pueden ejecutar esta acción.');
+    END IF;
 
+    -- 1. Actualizar la postulación del alumno en ese horario
+    UPDATE public.postulaciones
+    SET electivo_id = p_nuevo_electivo_id
+    WHERE alumno_id = p_alumno_id AND horario_id = p_horario_id;
+    
+    -- Si el alumno no tenía una postulación previa en este bloque (caso extremo), la creamos
+    IF NOT FOUND THEN
+        INSERT INTO public.postulaciones (alumno_id, electivo_id, horario_id)
+        VALUES (p_alumno_id, p_nuevo_electivo_id, p_horario_id);
+    END IF;
+
+    -- 2. Eliminar al alumno de la lista de espera (solo su registro)
+    DELETE FROM public.lista_espera
+    WHERE id = p_espera_id AND alumno_id = p_alumno_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'message', 'Cupo reasignado correctamente (Sobrecupo aplicado).'
+    );
+EXCEPTION WHEN OTHERS THEN
+    RETURN jsonb_build_object(
+        'success', false,
+        'message', SQLERRM
+    );
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.asignar_cupo_lista_espera(UUID, UUID, UUID, UUID) TO authenticated;
