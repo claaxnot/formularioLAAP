@@ -1947,15 +1947,48 @@ export default function AdminDashboard() {
                   <label htmlFor="waitlistFilter" style={{ fontWeight: 'bold' }}>Filtrar por Asignatura:</label>
                   <select
                     id="waitlistFilter"
-                    className="laap-input"
                     value={waitlistFilter}
                     onChange={(e) => setWaitlistFilter(e.target.value)}
-                    style={{ width: '250px' }}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--bg-input)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      width: '380px'
+                    }}
                   >
                     <option value="all">Ver todas las asignaturas</option>
-                    {electives.map(el => (
-                      <option key={el.id} value={el.id}>{el.nombre} ({el.nivel_destino})</option>
-                    ))}
+                    {(() => {
+                      const sorted = [...electives].sort((a, b) => {
+                        // 1. Horario (orden)
+                        const hA = horarios.find(h => String(h.id) === String(a.horario_id))?.orden || 0;
+                        const hB = horarios.find(h => String(h.id) === String(b.horario_id))?.orden || 0;
+                        if (hA !== hB) return hA - hB;
+                        // 2. Area
+                        const areaA = areas.find(ar => ar.id === a.area_id)?.nombre || '';
+                        const areaB = areas.find(ar => ar.id === b.area_id)?.nombre || '';
+                        if (areaA.localeCompare(areaB) !== 0) return areaA.localeCompare(areaB);
+                        // 3. Nivel Destino
+                        if (a.nivel_destino !== b.nivel_destino) return a.nivel_destino.localeCompare(b.nivel_destino);
+                        // 4. Nombre
+                        return a.nombre.localeCompare(b.nombre);
+                      });
+                      
+                      return sorted.map(el => {
+                        const hor = horarios.find(h => String(h.id) === String(el.horario_id));
+                        const hName = hor ? hor.nombre : `H${el.horario_id}`;
+                        const areaCode = getAreaCode(el.area_id);
+                        return (
+                          <option key={el.id} value={el.id}>
+                            [{hName} - Área {areaCode}] {el.nombre} ({el.nivel_destino})
+                          </option>
+                        );
+                      });
+                    })()}
                   </select>
                 </div>
               </div>
