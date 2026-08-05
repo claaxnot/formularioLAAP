@@ -877,18 +877,19 @@ export default function AdminDashboard() {
 
       // --- PESTAÑA 1: Resumen General ---
       const summaryData = [
-        ["REPORTES Y ROSTER DE POSTULACIÓN ELECTIVOS 2026", ""],
-        ["Liceo Arturo Alessandri Palma - Providencia", ""],
-        ["Nivel Destino:", nivelDestino === '3M' ? "3° Medio (3M)" : "4° Medio (4M)"],
-        ["Fecha de Generación:", new Date().toLocaleString('es-CL')],
-        ["", ""],
-        ["Asignatura / Modalidad", "Estudiantes Inscritos / Seleccionados"]
+        ["REPORTES Y ROSTER DE POSTULACIÓN ELECTIVOS 2026", "", ""],
+        ["Liceo Arturo Alessandri Palma - Providencia", "", ""],
+        ["Nivel Destino:", nivelDestino === '3M' ? "3° Medio (3M)" : "4° Medio (4M)", ""],
+        ["Fecha de Generación:", new Date().toLocaleString('es-CL'), ""],
+        ["", "", ""],
+        ["Asignatura / Modalidad", "Estudiantes Inscritos / Seleccionados", "En Lista de Espera"]
       ];
 
       // Sumar conteo por cada asignatura electiva
       levelElectives.forEach(el => {
         const enrolledCount = postulaciones.filter(p => p.electivo_id === el.id).length;
-        summaryData.push([el.nombre, enrolledCount]);
+        const waitlistCount = waitlist.filter(w => w.electivo_id === el.id).length;
+        summaryData.push([el.nombre, enrolledCount, waitlistCount]);
       });
 
       // Sumar conteo de alumnos de modalidad Técnico Profesional (Gastronomía)
@@ -896,7 +897,7 @@ export default function AdminDashboard() {
         const st = students.find(s => s.id === em.alumno_id);
         return em.modalidad === 'tecnico_profesional_gastronomia' && st && getStudentNivelDestino(st.curso_actual) === nivelDestino;
       });
-      summaryData.push(["Técnico Profesional (Gastronomía)", tpRecords.length]);
+      summaryData.push(["Técnico Profesional (Gastronomía)", tpRecords.length, 0]);
 
       const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
       
@@ -2259,6 +2260,7 @@ export default function AdminDashboard() {
                       <th onClick={() => handleSortElectivos('cupos_maximos')} style={{ cursor: 'pointer', userSelect: 'none' }}>Capacidad {renderSortIcon('cupos_maximos')}</th>
                       <th onClick={() => handleSortElectivos('inscritos')} style={{ cursor: 'pointer', userSelect: 'none' }}>Inscritos {renderSortIcon('inscritos')}</th>
                       <th onClick={() => handleSortElectivos('vacantes')} style={{ cursor: 'pointer', userSelect: 'none' }}>Vacantes {renderSortIcon('vacantes')}</th>
+                      <th onClick={() => handleSortElectivos('espera')} style={{ cursor: 'pointer', userSelect: 'none' }}>En Espera {renderSortIcon('espera')}</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
@@ -2291,6 +2293,11 @@ export default function AdminDashboard() {
                               <td>
                                 <span className={`vacantes-badge ${cuposDisponibles <= 0 ? 'zero' : ''}`}>
                                   {cuposDisponibles}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`vacantes-badge ${waitlist.filter(w => w.electivo_id === el.id).length > 0 ? 'zero' : ''}`} style={waitlist.filter(w => w.electivo_id === el.id).length > 0 ? {backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444'} : {backgroundColor: 'rgba(243, 244, 246, 0.8)', color: '#9ca3af', border: 'none'}}>
+                                  {waitlist.filter(w => w.electivo_id === el.id).length}
                                 </span>
                               </td>
                               <td>
@@ -2337,6 +2344,7 @@ export default function AdminDashboard() {
                       <th onClick={() => handleSortElectivos('cupos_maximos')} style={{ cursor: 'pointer', userSelect: 'none' }}>Capacidad {renderSortIcon('cupos_maximos')}</th>
                       <th onClick={() => handleSortElectivos('inscritos')} style={{ cursor: 'pointer', userSelect: 'none' }}>Inscritos {renderSortIcon('inscritos')}</th>
                       <th onClick={() => handleSortElectivos('vacantes')} style={{ cursor: 'pointer', userSelect: 'none' }}>Vacantes {renderSortIcon('vacantes')}</th>
+                      <th onClick={() => handleSortElectivos('espera')} style={{ cursor: 'pointer', userSelect: 'none' }}>En Espera {renderSortIcon('espera')}</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
@@ -2369,6 +2377,11 @@ export default function AdminDashboard() {
                               <td>
                                 <span className={`vacantes-badge ${cuposDisponibles <= 0 ? 'zero' : ''}`}>
                                   {cuposDisponibles}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={`vacantes-badge ${waitlist.filter(w => w.electivo_id === el.id).length > 0 ? 'zero' : ''}`} style={waitlist.filter(w => w.electivo_id === el.id).length > 0 ? {backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444'} : {backgroundColor: 'rgba(243, 244, 246, 0.8)', color: '#9ca3af', border: 'none'}}>
+                                  {waitlist.filter(w => w.electivo_id === el.id).length}
                                 </span>
                               </td>
                               <td>
