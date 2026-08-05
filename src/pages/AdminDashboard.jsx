@@ -101,6 +101,12 @@ export default function AdminDashboard() {
   const [waitlistAssignData, setWaitlistAssignData] = useState(null);
   const [isAssigningWaitlist, setIsAssigningWaitlist] = useState(false);
 
+  // Modal Añadir Manualmente a Lista de Espera
+  const [showManualWaitlistModal, setShowManualWaitlistModal] = useState(false);
+  const [manualWaitlistStudent, setManualWaitlistStudent] = useState(null);
+  const [manualWaitlistElectivo, setManualWaitlistElectivo] = useState('');
+  const [isSubmittingManualWaitlist, setIsSubmittingManualWaitlist] = useState(false);
+
   const [currentElective, setCurrentElective] = useState({
     id: null,
     nombre: '',
@@ -754,6 +760,39 @@ export default function AdminDashboard() {
       alert("Error al asignar cupo: " + err.message);
     } finally {
       setIsAssigningWaitlist(false);
+    }
+  };
+
+  const handleAddManualWaitlist = async (e) => {
+    e.preventDefault();
+    if (!manualWaitlistElectivo || !manualWaitlistStudent) return;
+    
+    setIsSubmittingManualWaitlist(true);
+    try {
+      // Verificar si ya está en esta lista de espera
+      const yaEnEspera = waitlist.find(w => w.alumno_id === manualWaitlistStudent.id && String(w.electivo_id) === String(manualWaitlistElectivo));
+      if (yaEnEspera) {
+        alert("El estudiante ya se encuentra en la lista de espera de este electivo.");
+        setIsSubmittingManualWaitlist(false);
+        return;
+      }
+      
+      const { error } = await supabase.from('lista_espera').insert([
+        { alumno_id: manualWaitlistStudent.id, electivo_id: manualWaitlistElectivo }
+      ]);
+      
+      if (error) throw error;
+      
+      showToast("Estudiante añadido a la lista de espera correctamente", "success");
+      setShowManualWaitlistModal(false);
+      setManualWaitlistStudent(null);
+      setManualWaitlistElectivo('');
+      fetchAdminData(false);
+    } catch (err) {
+      console.error(err);
+      alert("Error al añadir a lista de espera: " + err.message);
+    } finally {
+      setIsSubmittingManualWaitlist(false);
     }
   };
 
@@ -2539,6 +2578,19 @@ export default function AdminDashboard() {
                                     <Edit3 size={10} />
                                     <span>Editar</span>
                                   </button>
+                                  
+                                  <button
+                                    className="btn-table-action"
+                                    onClick={() => {
+                                      setManualWaitlistStudent(st);
+                                      setShowManualWaitlistModal(true);
+                                    }}
+                                    title="Añadir manualmente a lista de espera"
+                                    style={{ padding: '3px 6px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px', margin: 0, height: '24px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.25)' }}
+                                  >
+                                    <Clock size={10} />
+                                    <span>Lista Espera</span>
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -3702,6 +3754,84 @@ export default function AdminDashboard() {
                   {isAssigningWaitlist ? 'Procesando...' : 'Confirmar Asignación'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL AÑADIR A LISTA DE ESPERA MANUAL */}
+        {showManualWaitlistModal && manualWaitlistStudent && (
+          <div className="laap-modal-backdrop animate-fadeIn">
+            <div className="laap-modal-card" style={{ maxWidth: '500px' }}>
+              <div className="modal-header">
+                <h2 style={{ margin: 0, fontSize: '18px' }}>Añadir a Lista de Espera</h2>
+                <button className="btn-modal-close" onClick={() => {
+                  setShowManualWaitlistModal(false);
+                  setManualWaitlistStudent(null);
+                  setManualWaitlistElectivo('');
+                }}>×</button>
+              </div>
+              
+              <form onSubmit={handleAddManualWaitlist} className="modal-form" style={{ padding: '20px 0' }}>
+                <p style={{ margin: '0 0 15px 0', fontSize: '13.5px', color: 'var(--text-secondary)' }}>
+                  Añadiendo a: <strong style={{ color: 'var(--text-primary)' }}>{manualWaitlistStudent.nombre_completo}</strong>
+                </p>
+                
+                <div className="form-group">
+                  <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Seleccionar Electivo</label>
+                  <select
+                    value={manualWaitlistElectivo}
+                    onChange={(e) => setManualWaitlistElectivo(e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--bg-input)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px'
+                    }}
+                  >
+                    <option value="">-- Seleccione una asignatura --</option>
+                    {(() => {
+                      const stNivel = getStudentNivelDestino(manualWaitlistStudent.curso_actual) || '3M';
+                      const sorted = electives.filter(e => e.nivel_destino === stNivel).sort((a, b) => {
+                        const hA = horarios.find(h => String(h.id) === String(a.horario_id))?.orden || 0;
+                        const hB = horarios.find(h => String(h.id) === String(b.horario_id))?.orden || 0;
+                        if (hA !== hB) return hA - hB;
+                        const areaA = areas.find(ar => ar.id === a.area_id)?.nombre || '';
+                        const areaB = areas.find(ar => ar.id === b.area_id)?.nombre || '';
+                        if (areaA.localeCompare(areaB) !== 0) return areaA.localeCompare(areaB);
+                        return a.nombre.localeCompare(b.nombre);
+                      });
+                      
+                      return sorted.map(el => {
+                        const hor = horarios.find(h => String(h.id) === String(el.horario_id));
+                        const hName = hor ? hor.nombre : `H${el.horario_id}`;
+                        const areaCode = getAreaCode(el.area_id);
+                        return (
+                          <option key={el.id} value={el.id}>
+                            [{hName} - Área {areaCode}] {el.nombre}
+                          </option>
+                        );
+                      });
+                    })()}
+                  </select>
+                </div>
+                
+                <div className="modal-actions" style={{ marginTop: '24px' }}>
+                  <button type="button" className="laap-btn-text" onClick={() => {
+                    setShowManualWaitlistModal(false);
+                    setManualWaitlistStudent(null);
+                    setManualWaitlistElectivo('');
+                  }} disabled={isSubmittingManualWaitlist}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="laap-btn-primary" disabled={isSubmittingManualWaitlist || !manualWaitlistElectivo}>
+                    {isSubmittingManualWaitlist ? 'Añadiendo...' : 'Añadir a Espera'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
