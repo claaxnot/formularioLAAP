@@ -3557,6 +3557,46 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* MODAL ASIGNACIÓN LISTA ESPERA */}
+        {showWaitlistModal && waitlistAssignData && (
+          <div className="laap-modal-overlay animate-fadeIn">
+            <div className="laap-modal-content">
+              <h2>Confirmar Asignación de Sobrecupo</h2>
+              <div style={{ margin: '20px 0', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                <p style={{ margin: '0 0 10px 0' }}>Estás a punto de reasignar oficialmente a:</p>
+                <h3 style={{ margin: '0 0 15px 0', color: '#1e293b' }}>{waitlistAssignData.alumno_nombre}</h3>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                  <div style={{ backgroundColor: '#fee2e2', padding: '12px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
+                    <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#991b1b', fontWeight: 'bold' }}>Electivo Actual (Se liberará cupo)</p>
+                    <p style={{ margin: 0, color: '#7f1d1d' }}>{waitlistAssignData.electivo_actual_nombre}</p>
+                  </div>
+                  <div style={{ backgroundColor: '#dcfce7', padding: '12px', borderRadius: '6px', border: '1px solid #86efac' }}>
+                    <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#166534', fontWeight: 'bold' }}>Nuevo Electivo (Lista Espera)</p>
+                    <p style={{ margin: 0, color: '#14532d' }}>{waitlistAssignData.nuevo_electivo_nombre}</p>
+                  </div>
+                </div>
+                
+                <p style={{ margin: '15px 0 0 0', fontSize: '0.9rem', color: '#64748b' }}>
+                  <strong>Bloque:</strong> {waitlistAssignData.horario_nombre}
+                </p>
+              </div>
+              <p style={{ color: '#b45309', backgroundColor: '#fef3c7', padding: '10px', borderRadius: '4px', fontSize: '0.9rem' }}>
+                ⚠️ Si confirmas, el alumno será inscrito como <strong>SOBRECUPO</strong> si el electivo destino ya estaba lleno. Se le quitará de la lista de espera de forma permanente.
+              </p>
+              
+              <div className="laap-modal-actions" style={{ marginTop: '24px' }}>
+                <button type="button" className="laap-btn-secondary" onClick={() => setShowWaitlistModal(false)} disabled={isAssigningWaitlist}>
+                  Cancelar
+                </button>
+                <button type="button" className="laap-btn-primary" onClick={handleAssignWaitlist} disabled={isAssigningWaitlist}>
+                  {isAssigningWaitlist ? 'Procesando...' : 'Confirmar Asignación'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   );
