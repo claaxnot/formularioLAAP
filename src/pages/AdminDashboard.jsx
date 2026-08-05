@@ -773,26 +773,34 @@ export default function AdminDashboard() {
         const elPosts = postulaciones.filter(p => p.electivo_id === el.id);
         const sheetRows = [];
 
-        // Encabezado de la hoja
+        // Obtener el nombre del horario
+        const schedule = horarios.find(h => h.id === el.horario_id || String(h.id) === String(el.horario_id))?.nombre || `Horario ${el.horario_id}`;
+        
+        // Encabezado superior de la hoja
         sheetRows.push([
-          "Nº", "RUT", "Nombre completo", "Curso actual", "Correo", "Horario", "Área", "Electivo", "Nivel destino"
+          `HORARIO: ${schedule}`, "", `ASIGNATURA ELECTIVA: ${el.nombre}`
+        ]);
+        sheetRows.push([]); // Fila vacía
+
+        // Generar 30 columnas genéricas de clases para asistencia
+        const classColumns = Array.from({ length: 30 }, (_, i) => `${i + 1}`);
+
+        // Encabezado de tabla
+        sheetRows.push([
+          "Nº", "Nº Lista", "RUT", "ESTUDIANTE", "CURSO", "CORREO", ...classColumns
         ]);
 
         elPosts.forEach((post, index) => {
           const st = students.find(s => s.id === post.alumno_id);
           if (st) {
-            const schedule = horarios.find(h => h.id === post.horario_id || String(h.id) === String(post.horario_id))?.nombre || `Horario ${post.horario_id}`;
-            const areaCode = getAreaCode(el.area_id);
             sheetRows.push([
               index + 1,
+              "", // Nº Lista en blanco
               st.rut || "—",
-              formatNombre(st.nombre_completo),
+              formatNombre(st.nombre_completo).toUpperCase(),
               st.curso_actual || "—",
               st.correo || "—",
-              schedule,
-              `Área ${areaCode}`,
-              el.nombre,
-              nivelDestino
+              ...Array(30).fill("")
             ]);
           }
         });
@@ -801,22 +809,20 @@ export default function AdminDashboard() {
         const elWaitlist = waitlist.filter(w => w.electivo_id === el.id);
         if (elWaitlist.length > 0) {
           sheetRows.push([]); // Fila vacía para separar
-          sheetRows.push(["LISTA DE ESPERA", "", "", "", "", "", "", "", ""]);
-          sheetRows.push(["Nº", "RUT", "NOMBRE COMPLETO", "CURSO", "CORREO", "", "", "", ""]);
+          sheetRows.push(["LISTA DE ESPERA", "", "", "", "", "", ...Array(30).fill("")]);
+          sheetRows.push(["Nº", "Nº Lista", "RUT", "ESTUDIANTE", "CURSO", "CORREO", ...classColumns]);
           
           elWaitlist.forEach((w, index) => {
             const st = students.find(s => s.id === w.alumno_id);
             if (st) {
               sheetRows.push([
                 index + 1,
+                "",
                 st.rut || "—",
                 formatNombre(st.nombre_completo).toUpperCase(),
                 st.curso_actual || "—",
                 st.correo || "—",
-                "",
-                "",
-                "",
-                ""
+                ...Array(30).fill("")
               ]);
             }
           });
