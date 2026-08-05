@@ -3592,6 +3592,41 @@ export default function AdminDashboard() {
                   <strong>Bloque:</strong> {waitlistAssignData.horario_nombre}
                 </p>
               </div>
+
+              {/* Otras Asignaturas del Estudiante */}
+              <div style={{ marginTop: '16px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-color)', borderRadius: '8px' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: 'var(--text-primary)' }}>Asignaturas inscritas actualmente:</h4>
+                {(() => {
+                  const studentPostulaciones = postulaciones.filter(p => p.alumno_id === waitlistAssignData.alumno_id);
+                  if (studentPostulaciones.length === 0) {
+                    return <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>El estudiante no tiene asignaturas inscritas.</p>;
+                  }
+                  // Ordenar por horario
+                  const sorted = [...studentPostulaciones].sort((a, b) => {
+                    const ha = horarios.find(h => String(h.id) === String(a.horario_id))?.orden || 0;
+                    const hb = horarios.find(h => String(h.id) === String(b.horario_id))?.orden || 0;
+                    return ha - hb;
+                  });
+                  
+                  return (
+                    <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                      {sorted.map(p => {
+                        const el = electives.find(e => e.id === p.electivo_id);
+                        const hor = horarios.find(h => String(h.id) === String(p.horario_id));
+                        const isTheOneChanging = String(p.horario_id) === String(waitlistAssignData.horario_id);
+                        
+                        return (
+                          <li key={p.id} style={{ marginBottom: '4px', color: isTheOneChanging ? '#ef4444' : 'inherit', textDecoration: isTheOneChanging ? 'line-through' : 'none' }}>
+                            <strong>{hor ? hor.nombre : `Bloque ${p.horario_id}`}:</strong> {el ? el.nombre : 'Desconocido'}
+                            {isTheOneChanging && <span style={{ marginLeft: '8px', fontSize: '11px', backgroundColor: '#fee2e2', color: '#991b1b', padding: '2px 6px', borderRadius: '4px', textDecoration: 'none', display: 'inline-block' }}>Se liberará</span>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  );
+                })()}
+              </div>
+              
               </div>
               <p style={{ color: '#b45309', backgroundColor: '#fef3c7', padding: '10px', borderRadius: '4px', fontSize: '0.9rem' }}>
                 ⚠️ Si confirmas, el alumno será inscrito como <strong>SOBRECUPO</strong> si el electivo destino ya estaba lleno. Se le quitará de la lista de espera de forma permanente.
