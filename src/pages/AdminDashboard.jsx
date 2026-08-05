@@ -2010,17 +2010,23 @@ export default function AdminDashboard() {
                                 <button
                                   className="btn-table-action"
                                   onClick={() => {
-                                    setWaitlistAssignData({
-                                      waitlist_id: w.id,
-                                      alumno_id: w.alumno_id,
-                                      alumno_nombre: getAlumnoName(w.alumno_id),
-                                      horario_id: targetHorarioId,
-                                      horario_nombre: getScheduleName(targetHorarioId || 1),
-                                      nuevo_electivo_id: w.electivo_id,
-                                      nuevo_electivo_nombre: getElectiveName(w.electivo_id),
-                                      electivo_actual_nombre: currentElectiveName
-                                    });
-                                    setShowWaitlistModal(true);
+                                    console.log("CLICK EN ASIGNAR CUPO", w);
+                                    try {
+                                      setWaitlistAssignData({
+                                        waitlist_id: w.id,
+                                        alumno_id: w.alumno_id,
+                                        alumno_nombre: getAlumnoName(w.alumno_id),
+                                        horario_id: targetHorarioId,
+                                        horario_nombre: getScheduleName(targetHorarioId || 1),
+                                        nuevo_electivo_id: w.electivo_id,
+                                        nuevo_electivo_nombre: getElectiveName(w.electivo_id),
+                                        electivo_actual_nombre: currentElectiveName
+                                      });
+                                      setShowWaitlistModal(true);
+                                    } catch (err) {
+                                      console.error("Error al setear datos:", err);
+                                      alert("Error interno al preparar datos: " + err.message);
+                                    }
                                   }}
                                   style={{ backgroundColor: '#2563eb', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem' }}
                                 >
