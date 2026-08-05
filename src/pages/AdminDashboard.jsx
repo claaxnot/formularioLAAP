@@ -598,6 +598,61 @@ export default function AdminDashboard() {
     );
   };
 
+  const handleResendEmail = async (st) => {
+    try {
+      showToast(`Reenviando correo a ${st.nombre_completo}...`, 'info');
+      
+      // 1. Obtener modalidad
+      const isTP = eleccionesModalidad.some(m => m.alumno_id === st.id && m.modalidad === 'tecnico_profesional_gastronomia');
+      const isCH = eleccionesModalidad.some(m => m.alumno_id === st.id && m.modalidad === 'cientifico_humanista');
+      
+      const modalidad = isTP ? 'tecnico_profesional_gastronomia' : (isCH ? 'cientifico_humanista' : null);
+      if (!modalidad) throw new Error("Modalidad no declarada (el estudiante no ha finalizado su proceso).");
+
+      // 2. Obtener electivos
+      const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
+      const electivesPayload = stPosts.map(p => {
+        const el = electives.find(e => e.id === p.electivo_id);
+        const hor = horarios.find(h => h.id === p.horario_id);
+        const area = areas.find(a => el && a.id === el.area_id);
+        return {
+          nombre: el ? el.nombre : 'Desconocido',
+          horario_nombre: hor ? hor.nombre : 'Desconocido',
+          area_codigo: area ? area.codigo : 'Desconocido'
+        };
+      });
+
+      // 3. Preparar Payload y enviar via edge function
+      const payload = {
+        alumno_id: st.id,
+        email: st.correo,
+        nombre_completo: st.nombre_completo,
+        rut: st.rut,
+        curso_actual: st.curso_actual,
+        modalidad: modalidad,
+        correo_apoderado_1: st.correo_apoderado_1,
+        correo_apoderado_2: st.correo_apoderado_2,
+        electivos: electivesPayload
+      };
+      
+      const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: payload
+      });
+
+      if (error || (data && !data.success)) {
+        console.error("Detalle del error de reenvío en Edge Function:", error || data);
+        throw new Error(error?.message || data?.error || 'Error desconocido al reenviar. Ver consola.');
+      }
+
+      await supabase.from('alumnos').update({ estado_correo: 'enviado' }).eq('id', st.id);
+      fetchAdminData();
+      showToast("Correo reenviado exitosamente", "success");
+    } catch (e) {
+      console.error("Error completo al reenviar correo desde admin:", e);
+      showToast(`Falló el reenvío: ${e.message}`, "error");
+    }
+  };
+
   // Eliminar Postulación (Admin Override real - libera todos los cupos del alumno para permitirle postular de nuevo)
   const handleDeletePostulacion = async (postItem) => {
     const studentName = getAlumnoName(postItem.alumno_id);
@@ -2524,15 +2579,32 @@ export default function AdminDashboard() {
                                   )}
                                   
                                   {hasSubmitted && (
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '1px' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
                                       {st.estado_correo === 'enviado' ? (
                                         <span className="status-pill available" style={{ fontSize: '9px', padding: '1px 4px', fontWeight: 'bold', backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                                           📧 Enviado
                                         </span>
                                       ) : st.estado_correo === 'error' ? (
-                                        <span className="status-pill full" style={{ fontSize: '9px', padding: '1px 4px', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                                          📧 Error
-                                        </span>
+                                        <>
+                                          <span className="status-pill full" style={{ fontSize: '9px', padding: '1px 4px', fontWeight: 'bold', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                                            📧 Error
+                                          </span>
+                                          <button 
+                                            onClick={() => handleResendEmail(st)}
+                                            style={{ 
+                                              background: 'none', 
+                                              border: '1px solid #d1d5db', 
+                                              borderRadius: '4px', 
+                                              padding: '1px 4px', 
+                                              cursor: 'pointer',
+                                              fontSize: '9px',
+                                              color: '#4b5563'
+                                            }}
+                                            title="Reintentar envío de correo"
+                                          >
+                                            🔄 Reenviar
+                                          </button>
+                                        </>
                                       ) : (
                                         <span className="status-pill full" style={{ fontSize: '9px', padding: '1px 4px', fontWeight: 'bold', backgroundColor: 'rgba(156, 163, 175, 0.1)', color: '#9ca3af', border: '1px solid rgba(156, 163, 175, 0.2)' }}>
                                           📧 Pend.
