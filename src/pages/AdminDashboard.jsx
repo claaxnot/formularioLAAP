@@ -106,6 +106,7 @@ export default function AdminDashboard() {
   const [manualWaitlistStudent, setManualWaitlistStudent] = useState(null);
   const [manualWaitlistElectivo, setManualWaitlistElectivo] = useState('');
   const [isSubmittingManualWaitlist, setIsSubmittingManualWaitlist] = useState(false);
+  const [waitlistSearchQuery, setWaitlistSearchQuery] = useState('');
 
   const [currentElective, setCurrentElective] = useState({
     id: null,
@@ -1982,8 +1983,20 @@ export default function AdminDashboard() {
                   <h2>Alumnos Registrados en Lista de Espera</h2>
                   <p style={{ margin: 0 }}>Seguimiento de estudiantes en cola de espera por falta de vacante.</p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                  <label htmlFor="waitlistFilter" style={{ fontWeight: 'bold' }}>Filtrar por Asignatura:</label>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    className="laap-btn-primary"
+                    onClick={() => {
+                      setWaitlistSearchQuery('');
+                      setManualWaitlistStudent(null);
+                      setShowManualWaitlistModal(true);
+                    }}
+                    style={{ height: '37px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Clock size={16} />
+                    <span>+ Añadir a Espera</span>
+                  </button>
+                  <label htmlFor="waitlistFilter" style={{ fontWeight: 'bold', marginLeft: '10px' }}>Filtrar por Asignatura:</label>
                   <select
                     id="waitlistFilter"
                     value={waitlistFilter}
@@ -2577,19 +2590,6 @@ export default function AdminDashboard() {
                                   >
                                     <Edit3 size={10} />
                                     <span>Editar</span>
-                                  </button>
-                                  
-                                  <button
-                                    className="btn-table-action"
-                                    onClick={() => {
-                                      setManualWaitlistStudent(st);
-                                      setShowManualWaitlistModal(true);
-                                    }}
-                                    title="Añadir manualmente a lista de espera"
-                                    style={{ padding: '3px 6px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px', margin: 0, height: '24px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.25)' }}
-                                  >
-                                    <Clock size={10} />
-                                    <span>Lista Espera</span>
                                   </button>
                                 </div>
                               </td>
@@ -3759,9 +3759,9 @@ export default function AdminDashboard() {
         )}
 
         {/* MODAL AÑADIR A LISTA DE ESPERA MANUAL */}
-        {showManualWaitlistModal && manualWaitlistStudent && (
+        {showManualWaitlistModal && (
           <div className="laap-modal-backdrop animate-fadeIn">
-            <div className="laap-modal-card" style={{ maxWidth: '500px' }}>
+            <div className="laap-modal-card" style={{ maxWidth: '550px' }}>
               <div className="modal-header">
                 <h2 style={{ margin: 0, fontSize: '18px' }}>Añadir a Lista de Espera</h2>
                 <button className="btn-modal-close" onClick={() => {
@@ -3772,65 +3772,149 @@ export default function AdminDashboard() {
               </div>
               
               <form onSubmit={handleAddManualWaitlist} className="modal-form" style={{ padding: '20px 0' }}>
-                <p style={{ margin: '0 0 15px 0', fontSize: '13.5px', color: 'var(--text-secondary)' }}>
-                  Añadiendo a: <strong style={{ color: 'var(--text-primary)' }}>{manualWaitlistStudent.nombre_completo}</strong>
-                </p>
-                
-                <div className="form-group">
-                  <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Seleccionar Electivo</label>
-                  <select
-                    value={manualWaitlistElectivo}
-                    onChange={(e) => setManualWaitlistElectivo(e.target.value)}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-color)',
-                      backgroundColor: 'var(--bg-input)',
-                      color: 'var(--text-primary)',
-                      fontSize: '13px'
-                    }}
-                  >
-                    <option value="">-- Seleccione una asignatura --</option>
-                    {(() => {
-                      const stNivel = getStudentNivelDestino(manualWaitlistStudent.curso_actual) || '3M';
-                      const sorted = electives.filter(e => e.nivel_destino === stNivel).sort((a, b) => {
-                        const hA = horarios.find(h => String(h.id) === String(a.horario_id))?.orden || 0;
-                        const hB = horarios.find(h => String(h.id) === String(b.horario_id))?.orden || 0;
-                        if (hA !== hB) return hA - hB;
-                        const areaA = areas.find(ar => ar.id === a.area_id)?.nombre || '';
-                        const areaB = areas.find(ar => ar.id === b.area_id)?.nombre || '';
-                        if (areaA.localeCompare(areaB) !== 0) return areaA.localeCompare(areaB);
-                        return a.nombre.localeCompare(b.nombre);
-                      });
-                      
-                      return sorted.map(el => {
-                        const hor = horarios.find(h => String(h.id) === String(el.horario_id));
-                        const hName = hor ? hor.nombre : `H${el.horario_id}`;
-                        const areaCode = getAreaCode(el.area_id);
-                        return (
-                          <option key={el.id} value={el.id}>
-                            [{hName} - Área {areaCode}] {el.nombre}
-                          </option>
-                        );
-                      });
-                    })()}
-                  </select>
-                </div>
-                
-                <div className="modal-actions" style={{ marginTop: '24px' }}>
-                  <button type="button" className="laap-btn-text" onClick={() => {
-                    setShowManualWaitlistModal(false);
-                    setManualWaitlistStudent(null);
-                    setManualWaitlistElectivo('');
-                  }} disabled={isSubmittingManualWaitlist}>
-                    Cancelar
-                  </button>
-                  <button type="submit" className="laap-btn-primary" disabled={isSubmittingManualWaitlist || !manualWaitlistElectivo}>
-                    {isSubmittingManualWaitlist ? 'Añadiendo...' : 'Añadir a Espera'}
-                  </button>
-                </div>
+                {!manualWaitlistStudent ? (
+                  <div className="form-group">
+                    <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Buscar Estudiante</label>
+                    <div style={{ position: 'relative', marginBottom: '10px' }}>
+                      <Search size={16} style={{ position: 'absolute', left: '10px', top: '10px', color: '#9ca3af' }} />
+                      <input
+                        type="text"
+                        placeholder="Buscar por nombre, RUT o correo..."
+                        value={waitlistSearchQuery}
+                        onChange={(e) => setWaitlistSearchQuery(e.target.value)}
+                        autoFocus
+                        style={{
+                          width: '100%',
+                          padding: '8px 10px 8px 34px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-color)',
+                          backgroundColor: 'var(--bg-input)',
+                          color: 'var(--text-primary)',
+                          fontSize: '13px'
+                        }}
+                      />
+                    </div>
+                    <div style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '6px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                      {students.filter(st => {
+                        const q = waitlistSearchQuery.toLowerCase();
+                        if (!q) return false;
+                        return (st.nombre_completo?.toLowerCase().includes(q) || 
+                                st.rut?.toLowerCase().includes(q) || 
+                                st.correo?.toLowerCase().includes(q));
+                      }).slice(0, 10).map(st => (
+                        <div
+                          key={st.id}
+                          onClick={() => setManualWaitlistStudent(st)}
+                          style={{
+                            padding: '12px',
+                            borderBottom: '1px solid var(--border-color)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '4px',
+                            backgroundColor: 'var(--bg-card)'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-card)'}
+                        >
+                          <strong style={{ fontSize: '12.5px' }}>{formatNombre(st.nombre_completo)}</strong>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{st.rut || 'Sin RUT'} | Curso: {st.curso_actual || '3° Medio'}</span>
+                        </div>
+                      ))}
+                      {waitlistSearchQuery && students.filter(st => {
+                        const q = waitlistSearchQuery.toLowerCase();
+                        return (st.nombre_completo?.toLowerCase().includes(q) || 
+                                st.rut?.toLowerCase().includes(q) || 
+                                st.correo?.toLowerCase().includes(q));
+                      }).length === 0 && (
+                        <div style={{ padding: '20px 10px', fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center' }}>No se encontraron alumnos coincidentes.</div>
+                      )}
+                      {!waitlistSearchQuery && (
+                        <div style={{ padding: '20px 10px', fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center' }}>Escribe arriba para buscar un alumno...</div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
+                      <div>
+                        <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>Estudiante seleccionado:</p>
+                        <strong style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{formatNombre(manualWaitlistStudent.nombre_completo)}</strong>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={() => { setManualWaitlistStudent(null); setManualWaitlistElectivo(''); }}
+                        style={{ background: 'none', border: 'none', color: '#60a5fa', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline', padding: '4px' }}
+                      >
+                        Cambiar
+                      </button>
+                    </div>
+                    
+                    <div className="form-group">
+                      <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Seleccionar Electivo</label>
+                      <select
+                        value={manualWaitlistElectivo}
+                        onChange={(e) => setManualWaitlistElectivo(e.target.value)}
+                        required
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-color)',
+                          backgroundColor: 'var(--bg-input)',
+                          color: 'var(--text-primary)',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <option value="">-- Seleccione una asignatura --</option>
+                        {(() => {
+                          const stNivel = getStudentNivelDestino(manualWaitlistStudent.curso_actual) || '3M';
+                          const sorted = electives.filter(e => e.nivel_destino === stNivel).sort((a, b) => {
+                            const hA = horarios.find(h => String(h.id) === String(a.horario_id))?.orden || 0;
+                            const hB = horarios.find(h => String(h.id) === String(b.horario_id))?.orden || 0;
+                            if (hA !== hB) return hA - hB;
+                            const areaA = areas.find(ar => ar.id === a.area_id)?.nombre || '';
+                            const areaB = areas.find(ar => ar.id === b.area_id)?.nombre || '';
+                            if (areaA.localeCompare(areaB) !== 0) return areaA.localeCompare(areaB);
+                            return a.nombre.localeCompare(b.nombre);
+                          });
+                          
+                          const renderGroup = (nivel) => {
+                            return sorted.map(el => {
+                              const hor = horarios.find(h => String(h.id) === String(el.horario_id));
+                              const hName = hor ? hor.nombre : `H${el.horario_id}`;
+                              const areaCode = getAreaCode(el.area_id);
+                              return (
+                                <option key={el.id} value={el.id}>
+                                  [{hName} - Área {areaCode}] {el.nombre}
+                                </option>
+                              );
+                            });
+                          };
+
+                          return (
+                            <optgroup label={`Asignaturas ${stNivel === '3M' ? '3° Medio' : '4° Medio'}`}>
+                              {renderGroup(stNivel)}
+                            </optgroup>
+                          );
+                        })()}
+                      </select>
+                    </div>
+                    
+                    <div className="modal-actions" style={{ marginTop: '30px' }}>
+                      <button type="button" className="laap-btn-text" onClick={() => {
+                        setShowManualWaitlistModal(false);
+                        setManualWaitlistStudent(null);
+                        setManualWaitlistElectivo('');
+                      }} disabled={isSubmittingManualWaitlist}>
+                        Cancelar
+                      </button>
+                      <button type="submit" className="laap-btn-primary" disabled={isSubmittingManualWaitlist || !manualWaitlistElectivo}>
+                        {isSubmittingManualWaitlist ? 'Añadiendo...' : 'Añadir a Espera'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </form>
             </div>
           </div>
