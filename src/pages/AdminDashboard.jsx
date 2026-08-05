@@ -3565,10 +3565,15 @@ export default function AdminDashboard() {
 
         {/* MODAL ASIGNACIÓN LISTA ESPERA */}
         {showWaitlistModal && waitlistAssignData && (
-          <div className="laap-modal-overlay animate-fadeIn">
-            <div className="laap-modal-content">
-              <h2>Confirmar Asignación de Sobrecupo</h2>
-              <div style={{ margin: '20px 0', padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <div className="laap-modal-backdrop animate-fadeIn">
+            <div className="laap-modal-card" style={{ maxWidth: '500px' }}>
+              <div className="modal-header">
+                <h2 style={{ margin: 0, fontSize: '18px' }}>Confirmar Asignación de Sobrecupo</h2>
+                <button className="btn-modal-close" onClick={() => setShowWaitlistModal(false)}>×</button>
+              </div>
+              
+              <div className="modal-form" style={{ padding: '20px 0' }}>
+                <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <p style={{ margin: '0 0 10px 0' }}>Estás a punto de reasignar oficialmente a:</p>
                 <h3 style={{ margin: '0 0 15px 0', color: '#1e293b' }}>{waitlistAssignData.alumno_nombre}</h3>
                 
@@ -3587,12 +3592,13 @@ export default function AdminDashboard() {
                   <strong>Bloque:</strong> {waitlistAssignData.horario_nombre}
                 </p>
               </div>
+              </div>
               <p style={{ color: '#b45309', backgroundColor: '#fef3c7', padding: '10px', borderRadius: '4px', fontSize: '0.9rem' }}>
                 ⚠️ Si confirmas, el alumno será inscrito como <strong>SOBRECUPO</strong> si el electivo destino ya estaba lleno. Se le quitará de la lista de espera de forma permanente.
               </p>
               
-              <div className="laap-modal-actions" style={{ marginTop: '24px' }}>
-                <button type="button" className="laap-btn-secondary" onClick={() => setShowWaitlistModal(false)} disabled={isAssigningWaitlist}>
+              <div className="modal-actions" style={{ marginTop: '24px' }}>
+                <button type="button" className="laap-btn-text" onClick={() => setShowWaitlistModal(false)} disabled={isAssigningWaitlist}>
                   Cancelar
                 </button>
                 <button type="button" className="laap-btn-primary" onClick={handleAssignWaitlist} disabled={isAssigningWaitlist}>
