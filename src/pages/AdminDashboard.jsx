@@ -797,6 +797,31 @@ export default function AdminDashboard() {
           }
         });
 
+        // --- AGREGAR LISTA DE ESPERA ---
+        const elWaitlist = waitlist.filter(w => w.electivo_id === el.id);
+        if (elWaitlist.length > 0) {
+          sheetRows.push([]); // Fila vacía para separar
+          sheetRows.push(["LISTA DE ESPERA", "", "", "", "", "", "", "", ""]);
+          sheetRows.push(["Nº", "RUT", "NOMBRE COMPLETO", "CURSO", "CORREO", "", "", "", ""]);
+          
+          elWaitlist.forEach((w, index) => {
+            const st = students.find(s => s.id === w.alumno_id);
+            if (st) {
+              sheetRows.push([
+                index + 1,
+                st.rut || "—",
+                formatNombre(st.nombre_completo).toUpperCase(),
+                st.curso_actual || "—",
+                st.correo || "—",
+                "",
+                "",
+                "",
+                ""
+              ]);
+            }
+          });
+        }
+
         const ws = XLSX.utils.aoa_to_sheet(sheetRows);
 
         // Congelar primera fila (Header)
