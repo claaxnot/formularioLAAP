@@ -63,6 +63,7 @@ export default function AdminDashboard() {
   const [lastUpdated, setLastUpdated] = useState('');
   const [statsFilter, setStatsFilter] = useState('all'); // 'all', '3M', '4M'
   const [waitlistFilter, setWaitlistFilter] = useState('all'); // 'all', o id_electivo
+  const [waitlistLevelFilter, setWaitlistLevelFilter] = useState('all'); // 'all', '3M', '4M'
   const [acuseRecibos, setAcuseRecibos] = useState([]);
   const [acuseFilter, setAcuseFilter] = useState('all'); // 'all', 'pending', 'confirmed'
   const [acuseSearchQuery, setAcuseSearchQuery] = useState('');
@@ -87,6 +88,7 @@ export default function AdminDashboard() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetConfirmationText, setResetConfirmationText] = useState('');
   const [resetPreserveElectivos, setResetPreserveElectivos] = useState(true);
+  const [resetTargetLevel, setResetTargetLevel] = useState('ALL');
   const [isResetting, setIsResetting] = useState(false);
   const [guardianEmailsEnabled, setGuardianEmailsEnabled] = useState(true);
   const [togglingGuardianEmails, setTogglingGuardianEmails] = useState(false);
@@ -1378,7 +1380,8 @@ export default function AdminDashboard() {
     try {
       // Execute the reiniciar_ano_escolar RPC
       const { data, error } = await supabase.rpc('reiniciar_ano_escolar', {
-        p_limpiar_electivos: !resetPreserveElectivos
+        p_limpiar_electivos: resetTargetLevel === 'ALL' ? !resetPreserveElectivos : false,
+        p_target_level: resetTargetLevel
       });
 
       if (error) throw error;
@@ -1397,6 +1400,178 @@ export default function AdminDashboard() {
     } finally {
       setIsResetting(false);
     }
+  };
+
+  const fileInputRef = React.useRef(null);
+
+  const handleRestoreFromExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsResetting(true);
+    showToast("Analizando archivo Excel...", "info");
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const ab = evt.target.result;
+        const wb = XLSX.read(ab, { type: 'array' });
+
+        const postsToInsert = [];
+        const waitlistsToInsert = [];
+        const modalidadesToInsert = [];
+        const alumnosToUpdate = new Set();
+
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const data = XLSX.utils.sheet_to_json(ws, { header: 1 }); // array de arrays
+
+          if (sheetName === 'Resumen General') continue;
+
+          if (sheetName.includes('TP Gastronomía')) {
+            let started = false;
+            for (let i = 0; i < data.length; i++) {
+              const row = data[i];
+              if (!row || row.length === 0) continue;
+              if (row[0] === 'Nº' && row[1] === 'RUT') {
+                started = true;
+                continue;
+              }
+              if (started) {
+                const rut = row[1];
+                if (!rut || rut === '—') continue;
+                const student = students.find(s => s.rut === rut);
+                if (student) {
+                  modalidadesToInsert.push({ alumno_id: student.id, modalidad: 'tecnico_profesional_gastronomia' });
+                  alumnosToUpdate.add(student.id);
+                }
+              }
+            }
+          } else {
+            // Electivo normal
+            // El nombre exacto viene en la fila 0, columna 2
+            const firstRow = data[0];
+            if (!firstRow || !firstRow[2] || typeof firstRow[2] !== 'string' || !firstRow[2].startsWith('ASIGNATURA ELECTIVA: ')) {
+              console.warn(`Hoja ${sheetName} no tiene el formato esperado, se omite.`);
+              continue;
+            }
+            const exactElectiveName = firstRow[2].replace('ASIGNATURA ELECTIVA: ', '').trim();
+            
+            // Buscar coincidencia exacta en electivos
+            const matchedElectives = electives.filter(el => el.nombre.trim() === exactElectiveName);
+            if (matchedElectives.length === 0) {
+              console.warn(`No se encontró el electivo exacto para: ${exactElectiveName}`);
+              continue;
+            }
+
+            let started = false;
+            let isWaitlist = false;
+
+            for (let i = 0; i < data.length; i++) {
+              const row = data[i];
+              if (!row || row.length === 0) continue;
+
+              if (row[0] === 'LISTA DE ESPERA') {
+                isWaitlist = true;
+                started = false;
+                continue;
+              }
+
+              if (row[0] === 'Nº' && row[2] === 'RUT') {
+                started = true;
+                continue;
+              }
+
+              if (started) {
+                const rut = row[2];
+                if (!rut || rut === '—') continue;
+                const student = students.find(s => s.rut === rut);
+                if (student) {
+                  // Validar que el electivo pertenece al nivel de destino real del estudiante
+                  const studentDestino = getStudentNivelDestino(student.curso_actual);
+                  const targetElectivo = matchedElectives.find(el => el.nivel_destino === studentDestino);
+                  
+                  if (!targetElectivo) {
+                    console.warn(`No se encontró el electivo ${exactElectiveName} para el nivel de destino ${studentDestino} del estudiante ${student.rut}`);
+                    continue;
+                  }
+
+                  if (isWaitlist) {
+                    waitlistsToInsert.push({ alumno_id: student.id, electivo_id: targetElectivo.id });
+                  } else {
+                    postsToInsert.push({ alumno_id: student.id, electivo_id: targetElectivo.id, horario_id: targetElectivo.horario_id });
+                  }
+                  alumnosToUpdate.add(student.id);
+                }
+              }
+            }
+          }
+        }
+
+        if (postsToInsert.length === 0 && modalidadesToInsert.length === 0) {
+          showToast("No se encontraron registros válidos para restaurar.", "warning");
+          setIsResetting(false);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          return;
+        }
+
+        showToast(`Restaurando ${alumnosToUpdate.size} alumnos...`, "info");
+
+        // Deduplicar arrays para evitar error de ON CONFLICT en la misma transacción
+        const uniqueModalidadesMap = new Map();
+        for (const m of modalidadesToInsert) uniqueModalidadesMap.set(m.alumno_id, m);
+        const finalModalidadesToInsert = Array.from(uniqueModalidadesMap.values());
+
+        const uniquePostsMap = new Map();
+        for (const p of postsToInsert) uniquePostsMap.set(`${p.alumno_id}_${p.horario_id}`, p);
+        const finalPostsToInsert = Array.from(uniquePostsMap.values());
+
+        const uniqueWaitlistsMap = new Map();
+        for (const w of waitlistsToInsert) uniqueWaitlistsMap.set(`${w.alumno_id}_${w.electivo_id}`, w);
+        const finalWaitlistsToInsert = Array.from(uniqueWaitlistsMap.values());
+
+        // Insertar modalidades
+        if (finalModalidadesToInsert.length > 0) {
+          const { error } = await supabase.from('elecciones_modalidad').upsert(finalModalidadesToInsert, { onConflict: 'alumno_id' });
+          if (error) throw error;
+        }
+
+        // Insertar postulaciones
+        if (finalPostsToInsert.length > 0) {
+          const { error } = await supabase.from('postulaciones').upsert(finalPostsToInsert, { onConflict: 'alumno_id, horario_id' });
+          if (error) throw error;
+        }
+
+        // Insertar listas de espera
+        if (finalWaitlistsToInsert.length > 0) {
+          const { error } = await supabase.from('lista_espera').upsert(finalWaitlistsToInsert, { onConflict: 'alumno_id, electivo_id' });
+          if (error) throw error;
+        }
+
+        // Actualizar alumnos (batch de a 200)
+        const alumnosArray = Array.from(alumnosToUpdate);
+        if (alumnosArray.length > 0) {
+          const chunkSize = 200;
+          for (let i = 0; i < alumnosArray.length; i += chunkSize) {
+            const chunk = alumnosArray.slice(i, i + chunkSize);
+            const { error } = await supabase.from('alumnos')
+              .update({ ya_postulo: true, estado_correo: 'enviado' })
+              .in('id', chunk);
+            if (error) throw error;
+          }
+        }
+
+        showToast(`¡Éxito! Se restauró la información de ${alumnosArray.length} alumnos.`, "success");
+        await fetchAdminData(true);
+      } catch (err) {
+        console.error("Error restaurando Excel:", err);
+        showToast("Error al restaurar: " + err.message, "error");
+      } finally {
+        setIsResetting(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const handleExportAcusesExcel = () => {
@@ -2175,7 +2350,28 @@ export default function AdminDashboard() {
                     <Clock size={16} />
                     <span>+ Añadir a Espera</span>
                   </button>
-                  <label htmlFor="waitlistFilter" style={{ fontWeight: 'bold', marginLeft: '10px' }}>Filtrar por Asignatura:</label>
+                  <label htmlFor="waitlistLevelFilter" style={{ fontWeight: 'bold', marginLeft: '10px', marginRight: '6px' }}>Nivel:</label>
+                    <select
+                      id="waitlistLevelFilter"
+                      value={waitlistLevelFilter}
+                      onChange={(e) => setWaitlistLevelFilter(e.target.value)}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-color)',
+                        backgroundColor: 'var(--bg-input)',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="all">Todos</option>
+                      <option value="3M">3° Medio (Para actuales 2dos)</option>
+                      <option value="4M">4° Medio (Para actuales 3ros)</option>
+                    </select>
+
+                    <label htmlFor="waitlistFilter" style={{ fontWeight: 'bold', marginLeft: '10px' }}>Filtrar por Asignatura:</label>
                   <select
                     id="waitlistFilter"
                     value={waitlistFilter}
@@ -2251,7 +2447,21 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody>
                     {(() => {
-                      const filteredWaitlist = waitlistFilter === 'all' ? waitlist : waitlist.filter(w => String(w.electivo_id) === String(waitlistFilter));
+                      let filteredWaitlist = waitlist;
+                      
+                      // 1. Filtrar por Nivel de Destino del Electivo
+                      if (waitlistLevelFilter !== 'all') {
+                        filteredWaitlist = filteredWaitlist.filter(w => {
+                          const matchedElective = electives.find(e => e.id === w.electivo_id);
+                          return matchedElective && matchedElective.nivel_destino === waitlistLevelFilter;
+                        });
+                      }
+                      
+                      // 2. Filtrar por Asignatura Específica
+                      if (waitlistFilter !== 'all') {
+                        filteredWaitlist = filteredWaitlist.filter(w => String(w.electivo_id) === String(waitlistFilter));
+                      }
+
                       if (filteredWaitlist.length === 0) {
                         return (
                           <tr>
@@ -3212,6 +3422,62 @@ export default function AdminDashboard() {
                   </button>
                 </div>
               </div>
+
+              {/* CARD 4: RESTAURAR DESDE RESPALDO */}
+              <div style={{
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                padding: '24px',
+                boxShadow: 'var(--shadow-subtle)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between'
+              }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                    <div style={{
+                      backgroundColor: 'rgba(59, 130, 246, 0.15)',
+                      color: '#3b82f6',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <Upload size={24} />
+                    </div>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 'bold' }}>Restaurar Respaldo</h3>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Recuperar datos perdidos</span>
+                    </div>
+                  </div>
+                  
+                  <p style={{ fontSize: '13.5px', lineHeight: '1.5', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                    Sube un archivo Excel de "roster_electivos" descargado previamente para restaurar las postulaciones de los estudiantes si ocurrió un error.
+                  </p>
+                  
+                </div>
+                
+                <div>
+                  <input 
+                    type="file" 
+                    accept=".xlsx, .xls" 
+                    ref={fileInputRef} 
+                    style={{ display: 'none' }} 
+                    onChange={handleRestoreFromExcel} 
+                  />
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isResetting}
+                    className="laap-btn-primary" 
+                    style={{ margin: 0, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', opacity: isResetting ? 0.7 : 1 }}
+                  >
+                    <Upload size={16} />
+                    <span>{isResetting ? "Restaurando..." : "Subir Archivo Excel"}</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* IMPORT SUMMARY REPORT */}
@@ -3789,16 +4055,16 @@ export default function AdminDashboard() {
                 }}>
                   <strong>Se realizarán las siguientes acciones:</strong>
                   <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
-                    <li>Eliminar permanentemente todas las postulaciones confirmadas.</li>
-                    <li>Eliminar todas las reservas de cupos temporales.</li>
-                    <li>Vaciar todas las listas de espera de los electivos.</li>
-                    <li>Eliminar todas las elecciones de modalidad Técnico-Profesional (Gastronomía).</li>
-                    <li>Restablecer a todos los estudiantes (<code>ya_postulo = false</code>, <code>estado_correo = 'pendiente'</code>).</li>
-                    <li>Cerrar todos los procesos activos de postulación (3M y 4M).</li>
+                    <li>Eliminar permanentemente todas las postulaciones confirmadas {resetTargetLevel !== 'ALL' ? `(solo ${resetTargetLevel === '2M' ? '2dos' : '3ros'} medios)` : ''}.</li>
+                    <li>Eliminar todas las reservas de cupos temporales {resetTargetLevel !== 'ALL' ? `(solo ${resetTargetLevel === '2M' ? '2dos' : '3ros'} medios)` : ''}.</li>
+                    <li>Vaciar todas las listas de espera {resetTargetLevel !== 'ALL' ? `(solo ${resetTargetLevel === '2M' ? '2dos' : '3ros'} medios)` : ''}.</li>
+                    <li>Eliminar elecciones de modalidad Técnico-Profesional {resetTargetLevel !== 'ALL' ? `(solo ${resetTargetLevel === '2M' ? '2dos' : '3ros'} medios)` : ''}.</li>
+                    <li>Restablecer el estado a "no postulado" a los estudiantes afectados.</li>
+                    {resetTargetLevel === 'ALL' && <li>Cerrar todos los procesos activos de postulación.</li>}
                   </ul>
                 </div>
 
-                {/* OPCIÓN ADICIONAL: LIMPIAR ELECTIVOS */}
+                {/* OPCIÓN ADICIONAL: SELECCIONAR NIVEL */}
                 <div className="form-group" style={{ 
                   display: 'flex', 
                   flexDirection: 'column', 
@@ -3809,34 +4075,89 @@ export default function AdminDashboard() {
                   border: '1px solid var(--border-color)',
                   marginBottom: '20px'
                 }}>
-                  <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: 'var(--text-primary)' }}>¿Qué hacer con las asignaturas electivas creadas?</span>
+                  <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: 'var(--text-primary)' }}>¿Qué nivel deseas reiniciar?</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
                     <input
                       type="radio"
-                      id="preserveElectivosTrue"
-                      name="preserveElectivos"
-                      checked={resetPreserveElectivos === true}
-                      onChange={() => setResetPreserveElectivos(true)}
+                      id="targetLevelAll"
+                      name="targetLevel"
+                      checked={resetTargetLevel === 'ALL'}
+                      onChange={() => setResetTargetLevel('ALL')}
                       style={{ cursor: 'pointer' }}
                     />
-                    <label htmlFor="preserveElectivosTrue" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
-                      Mantener las asignaturas electivas vigentes
+                    <label htmlFor="targetLevelAll" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: resetTargetLevel === 'ALL' ? '#fca5a5' : 'var(--text-primary)' }}>
+                      Reinicio Completo (Todos los niveles)
                     </label>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <input
                       type="radio"
-                      id="preserveElectivosFalse"
-                      name="preserveElectivos"
-                      checked={resetPreserveElectivos === false}
-                      onChange={() => setResetPreserveElectivos(false)}
+                      id="targetLevel2M"
+                      name="targetLevel"
+                      checked={resetTargetLevel === '2M'}
+                      onChange={() => setResetTargetLevel('2M')}
                       style={{ cursor: 'pointer' }}
                     />
-                    <label htmlFor="preserveElectivosFalse" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: '#fca5a5' }}>
-                      Borrar también todas las asignaturas electivas
+                    <label htmlFor="targetLevel2M" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                      Solo 2° Medios (Alumnos que pasan a 3° Medio)
+                    </label>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="radio"
+                      id="targetLevel3M"
+                      name="targetLevel"
+                      checked={resetTargetLevel === '3M'}
+                      onChange={() => setResetTargetLevel('3M')}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <label htmlFor="targetLevel3M" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                      Solo 3° Medios (Alumnos que pasan a 4° Medio)
                     </label>
                   </div>
                 </div>
+
+                {/* OPCIÓN ADICIONAL: LIMPIAR ELECTIVOS (Solo visible en reinicio completo) */}
+                {resetTargetLevel === 'ALL' && (
+                  <div className="form-group" style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '8px', 
+                    padding: '12px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid var(--border-color)',
+                    marginBottom: '20px'
+                  }}>
+                    <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: 'var(--text-primary)' }}>¿Qué hacer con las asignaturas electivas creadas?</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                      <input
+                        type="radio"
+                        id="preserveElectivosTrue"
+                        name="preserveElectivos"
+                        checked={resetPreserveElectivos === true}
+                        onChange={() => setResetPreserveElectivos(true)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <label htmlFor="preserveElectivosTrue" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500' }}>
+                        Mantener las asignaturas electivas vigentes
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="radio"
+                        id="preserveElectivosFalse"
+                        name="preserveElectivos"
+                        checked={resetPreserveElectivos === false}
+                        onChange={() => setResetPreserveElectivos(false)}
+                        style={{ cursor: 'pointer' }}
+                      />
+                      <label htmlFor="preserveElectivosFalse" style={{ cursor: 'pointer', fontSize: '13px', fontWeight: '500', color: '#fca5a5' }}>
+                        Borrar también todas las asignaturas electivas
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label style={{ fontWeight: 'bold', fontSize: '12.5px', color: 'var(--text-primary)' }}>
