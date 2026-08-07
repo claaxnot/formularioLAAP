@@ -751,7 +751,7 @@ export default function AdminDashboard() {
       if (error || (data && !data.success)) {
         let errorMsg = error?.message || data?.error || 'Error desconocido al reenviar.';
         
-        // Extraer mensaje real de Resend desde el response body si existe
+        // Extraer mensaje real de Edge Function desde el response body si existe
         if (error && error.context) {
           try {
             const bodyText = await error.context.text();

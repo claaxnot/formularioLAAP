@@ -33,14 +33,15 @@ serve(async (req) => {
     console.log("Alumno ID:", alumno_id || "No especificado")
     console.log("Modalidad:", modalidad)
 
-    // 1. VALIDACIÓN: RESEND_API_KEY
-    const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    if (!RESEND_API_KEY) {
-      console.error("Error de Validación: Falta RESEND_API_KEY en secrets.");
+    // 1. VALIDACIÓN: Credenciales SMTP
+    const SMTP_USER = Deno.env.get('SMTP_USER');
+    const SMTP_PASS = Deno.env.get('SMTP_PASS');
+    if (!SMTP_USER || !SMTP_PASS) {
+      console.error("Error de Validación: Faltan credenciales SMTP en secrets.");
       return new Response(JSON.stringify({
         success: false,
-        error: "No se ha configurado la variable de entorno RESEND_API_KEY en Supabase.",
-        details: "RESEND_API_KEY is missing or undefined inside Supabase Secrets."
+        error: "No se han configurado las variables de entorno SMTP en Supabase.",
+        details: "SMTP_USER or SMTP_PASS is missing or undefined inside Supabase Secrets."
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
@@ -212,38 +213,41 @@ serve(async (req) => {
       `;
     };
 
-    const emailSender = 'Electivos LAAP <electivoslaap@fplb.cl>';
+    const emailSender = Deno.env.get('SMTP_SENDER_EMAIL') || 'Electivos LAAP <electivoslaap@fplb.cl>';
     const sentTo = [];
 
-    // Helper para enviar correo vía Resend API
-    const sendResendEmail = async (toEmail: string, subject: string, htmlContent: string) => {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${RESEND_API_KEY}`
-        },
-        body: JSON.stringify({
-          from: emailSender,
-          reply_to: 'electivoslaap@fplb.cl',
-          to: [toEmail],
-          subject: subject,
-          html: htmlContent
-        })
+    // Helper para enviar correo vía SMTP (Nodemailer)
+    const sendSmtpEmail = async (toEmail: string, subject: string, htmlContent: string) => {
+      // Lazy import para evitar cargar nodemailer si no se usa
+      const nodemailer = await import('npm:nodemailer');
+
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true, // true para puerto 465, false para otros puertos
+        auth: {
+          user: Deno.env.get('SMTP_USER'),
+          pass: Deno.env.get('SMTP_PASS')
+        }
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Resend API Error: ${errorText}`);
-      }
-      return await res.json();
+      const info = await transporter.sendMail({
+        from: emailSender,
+        replyTo: 'electivoslaap@fplb.cl',
+        to: toEmail,
+        subject: subject,
+        html: htmlContent
+      });
+
+      console.log(`Correo enviado vía SMTP: ${info.messageId}`);
+      return info;
     };
 
     // 1. Enviar correo al Estudiante (Sin botón de acuse)
     if (email && email.trim() !== '') {
       console.log("Enviando comprobante al estudiante:", email);
       const studentHtml = getHtml(false);
-      await sendResendEmail(email.trim(), 'Comprobante de Selección Académica - Liceo Arturo Alessandri Palma', studentHtml);
+      await sendSmtpEmail(email.trim(), 'Comprobante de Selección Académica - Liceo Arturo Alessandri Palma', studentHtml);
       sentTo.push(email.trim());
     }
 
@@ -269,7 +273,7 @@ serve(async (req) => {
       }
 
       const apoderado1Html = getHtml(true, token1);
-      await sendResendEmail(correo_apoderado_1.trim(), 'Acuse de Recibo: Elección Académica - Liceo Arturo Alessandri Palma', apoderado1Html);
+      await sendSmtpEmail(correo_apoderado_1.trim(), 'Acuse de Recibo: Elección Académica - Liceo Arturo Alessandri Palma', apoderado1Html);
       sentTo.push(correo_apoderado_1.trim());
     }
 
@@ -295,7 +299,7 @@ serve(async (req) => {
       }
 
       const apoderado2Html = getHtml(true, token2);
-      await sendResendEmail(correo_apoderado_2.trim(), 'Acuse de Recibo: Elección Académica - Liceo Arturo Alessandri Palma', apoderado2Html);
+      await sendSmtpEmail(correo_apoderado_2.trim(), 'Acuse de Recibo: Elección Académica - Liceo Arturo Alessandri Palma', apoderado2Html);
       sentTo.push(correo_apoderado_2.trim());
     }
 
