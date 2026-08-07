@@ -680,6 +680,33 @@ export default function StudentPortal() {
     );
   }
 
+  if (!isProcessOpen && !alreadySubmitted && modalidad !== 'tecnico_profesional_gastronomia') {
+    return (
+      <div className="laap-student-portal">
+        <Navbar />
+        <div className="laap-page-unauthorized">
+          <div className="laap-unauthorized-card" style={{ maxWidth: '600px', margin: '40px auto' }}>
+            <div className="unauthorized-icon-container" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>
+              <AlertTriangle size={48} />
+            </div>
+            <h1 className="unauthorized-title" style={{ color: 'var(--secondary-color)' }}>Formulario Bloqueado</h1>
+            <p className="unauthorized-lead" style={{ margin: '16px 0' }}>
+              El proceso de selección de electivos se encuentra actualmente cerrado.
+            </p>
+            <div className="unauthorized-instructions" style={{ marginTop: '20px', textAlign: 'center' }}>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: '1.6', margin: 0 }}>
+                No es posible realizar nuevas postulaciones ni declarar modalidad en este momento.
+              </p>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '12px', fontWeight: 'bold' }}>
+                Si crees que esto es un error o necesitas información adicional, por favor contacta a la Unidad Técnico Pedagógica (UTP).
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!modalidad) {
     return (
       <div className="laap-student-portal" style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -1002,29 +1029,6 @@ export default function StudentPortal() {
             </button>
           </div>
         )}
-        {/* Banner de Proceso Cerrado */}
-        {!isProcessOpen && (
-          <div style={{
-            padding: '16px',
-            backgroundColor: 'rgba(245, 158, 11, 0.15)',
-            border: '2px solid #f59e0b',
-            color: '#fbbf24',
-            borderRadius: '8px',
-            fontSize: '14px',
-            marginBottom: '20px',
-            lineHeight: '1.5',
-            fontWeight: 'bold',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px'
-          }}>
-            <AlertTriangle size={24} style={{ flexShrink: 0 }} />
-            <span>
-              El proceso de selección de electivos se encuentra cerrado. Si necesitas información, contacta a UTP.
-            </span>
-          </div>
-        )}
-
         {/* Encabezado del Portal */}
         <div className="portal-intro-section animate-fadeIn">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
