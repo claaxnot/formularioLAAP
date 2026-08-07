@@ -706,7 +706,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleResendEmail = async (st) => {
+  const handleReenviarCorreo = async (st) => {
     try {
       showToast(`Reenviando correo a ${st.nombre_completo}...`, 'info');
       
@@ -2726,7 +2726,7 @@ export default function AdminDashboard() {
                                             📧 Error
                                           </span>
                                           <button 
-                                            onClick={() => handleResendEmail(st)}
+                                            onClick={() => handleReenviarCorreo(st)}
                                             style={{ 
                                               background: 'none', 
                                               border: '1px solid #d1d5db', 
