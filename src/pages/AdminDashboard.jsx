@@ -108,6 +108,14 @@ export default function AdminDashboard() {
   const [isSubmittingManualWaitlist, setIsSubmittingManualWaitlist] = useState(false);
   const [waitlistSearchQuery, setWaitlistSearchQuery] = useState('');
 
+  // Modal Inscripción Manual Completa
+  const [showManualInscriptionModal, setShowManualInscriptionModal] = useState(false);
+  const [manualInscriptionStudent, setManualInscriptionStudent] = useState(null);
+  const [manualInscriptionModalidad, setManualInscriptionModalidad] = useState('');
+  const [manualInscriptionElectivos, setManualInscriptionElectivos] = useState({});
+  const [isSubmittingManualInscription, setIsSubmittingManualInscription] = useState(false);
+  const [manualInscriptionSendEmail, setManualInscriptionSendEmail] = useState(true);
+
   const [currentElective, setCurrentElective] = useState({
     id: null,
     nombre: '',
@@ -596,6 +604,106 @@ export default function AdminDashboard() {
         }
       }
     );
+  };
+  const handleManualInscriptionSubmit = async () => {
+    try {
+      setIsSubmittingManualInscription(true);
+      const student = manualInscriptionStudent;
+      const modalidad = manualInscriptionModalidad;
+
+      if (!modalidad) {
+        throw new Error("Debe seleccionar una modalidad.");
+      }
+
+      const nivelDestino = getStudentNivelDestino(student.curso_actual);
+      if (!nivelDestino) throw new Error("Curso actual inválido.");
+
+      const isCH = modalidad === 'cientifico_humanista';
+      const availableHorarios = horarios.filter(h =>
+        electives.some(e => e.nivel_destino === nivelDestino && String(e.horario_id) === String(h.id) && e.activo)
+      );
+
+      if (isCH) {
+        const selectedCount = Object.values(manualInscriptionElectivos).filter(v => v).length;
+        if (selectedCount !== availableHorarios.length) {
+          throw new Error("Debe seleccionar un electivo para cada bloque de horario disponible.");
+        }
+      }
+
+      // 1. Guardar Modalidad
+      const { error: modErr } = await supabase.from('elecciones_modalidad').insert({
+        alumno_id: student.id,
+        modalidad: modalidad
+      });
+      if (modErr) throw modErr;
+
+      // 2. Guardar Postulaciones si es CH
+      let electivesPayload = [];
+      if (isCH) {
+        const postsToInsert = Object.entries(manualInscriptionElectivos).map(([horarioId, electivoId]) => ({
+          alumno_id: student.id,
+          electivo_id: electivoId,
+          horario_id: horarioId
+        }));
+        
+        const { error: postErr } = await supabase.from('postulaciones').insert(postsToInsert);
+        if (postErr) throw postErr;
+
+        electivesPayload = postsToInsert.map(p => {
+          const el = electives.find(e => e.id === p.electivo_id);
+          const hor = horarios.find(h => h.id === p.horario_id);
+          const area = areas.find(a => el && a.id === el.area_id);
+          return {
+            nombre: el ? el.nombre : 'Desconocido',
+            horario_nombre: hor ? hor.nombre : 'Desconocido',
+            area_codigo: area ? area.codigo : 'Desconocido'
+          };
+        });
+      }
+
+      // 3. Update ya_postulo
+      let emailStatus = 'no_enviado';
+      if (manualInscriptionSendEmail) emailStatus = 'pendiente';
+
+      const { error: updErr } = await supabase.from('alumnos').update({
+        ya_postulo: true,
+        estado_correo: emailStatus
+      }).eq('id', student.id);
+      
+      if (updErr) throw updErr;
+
+      // 4. Send Email if requested
+      if (manualInscriptionSendEmail) {
+        const payload = {
+          alumno_id: student.id,
+          email: student.correo,
+          nombre_completo: student.nombre_completo,
+          rut: student.rut,
+          curso_actual: student.curso_actual,
+          nivel_destino: nivelDestino,
+          modalidad: modalidad,
+          correo_apoderado_1: student.correo_apoderado_1,
+          correo_apoderado_2: student.correo_apoderado_2,
+          electivos: electivesPayload
+        };
+        const { data, error } = await supabase.functions.invoke('send-confirmation-email', { body: payload });
+        if (error || (data && !data.success)) {
+          showToast("Inscripción guardada, pero el correo falló: " + (error?.message || data?.error), "warning");
+          await supabase.from('alumnos').update({ estado_correo: 'error' }).eq('id', student.id);
+        } else {
+          await supabase.from('alumnos').update({ estado_correo: 'enviado' }).eq('id', student.id);
+        }
+      }
+
+      showToast("Inscripción manual realizada con éxito.", "success");
+      setShowManualInscriptionModal(false);
+      fetchAdminData();
+
+    } catch (e) {
+      showToast("Error al inscribir: " + e.message, "error");
+    } finally {
+      setIsSubmittingManualInscription(false);
+    }
   };
 
   const handleResendEmail = async (st) => {
@@ -2679,7 +2787,19 @@ export default function AdminDashboard() {
                                       <span>Reiniciar</span>
                                     </button>
                                   ) : (
-                                    <span style={{ color: 'var(--text-secondary)', fontSize: '10px', marginRight: '4px' }}>—</span>
+                                    <button
+                                      onClick={() => {
+                                        setManualInscriptionStudent(st);
+                                        setManualInscriptionModalidad('');
+                                        setManualInscriptionElectivos({});
+                                        setShowManualInscriptionModal(true);
+                                      }}
+                                      title="Inscribir Manualmente"
+                                      style={{ padding: '3px 6px', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px', margin: 0, height: '24px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '4px', cursor: 'pointer' }}
+                                    >
+                                      <Plus size={10} />
+                                      <span>Inscribir</span>
+                                    </button>
                                   )}
                                   
                                   <button
@@ -4016,6 +4136,99 @@ export default function AdminDashboard() {
                   </>
                 )}
               </form>
+            </div>
+          </div>
+        )}
+
+        {showManualInscriptionModal && (
+          <div className="laap-modal-backdrop">
+            <div className="laap-modal-card animate-scaleIn" style={{ maxWidth: '600px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+              <div className="modal-header">
+                <h2>Inscripción Manual</h2>
+                <button className="btn-close-modal" onClick={() => setShowManualInscriptionModal(false)}><MailX size={18} /></button>
+              </div>
+              <div className="modal-body">
+                <div style={{ marginBottom: '20px', padding: '12px', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: 'var(--text-secondary)' }}>Estudiante:</p>
+                  <strong style={{ color: 'var(--text-primary)', fontSize: '14px' }}>{formatNombre(manualInscriptionStudent?.nombre_completo)}</strong>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>RUT: {manualInscriptionStudent?.rut} | Curso: {manualInscriptionStudent?.curso_actual}</p>
+                </div>
+
+                <div className="form-group">
+                  <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Modalidad Educativa</label>
+                  <select
+                    value={manualInscriptionModalidad}
+                    onChange={(e) => {
+                      setManualInscriptionModalidad(e.target.value);
+                      setManualInscriptionElectivos({});
+                    }}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">-- Seleccione --</option>
+                    <option value="tecnico_profesional_gastronomia">Técnico Profesional (Gastronomía)</option>
+                    <option value="cientifico_humanista">Científico Humanista</option>
+                  </select>
+                </div>
+
+                {manualInscriptionModalidad === 'cientifico_humanista' && (() => {
+                  const stNivel = getStudentNivelDestino(manualInscriptionStudent?.curso_actual) || '3M';
+                  const availableHorarios = horarios.filter(h =>
+                    electives.some(e => e.nivel_destino === stNivel && String(e.horario_id) === String(h.id) && e.activo)
+                  );
+
+                  return (
+                    <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      <h4 style={{ margin: 0, color: '#60a5fa', fontSize: '14px' }}>Selección de Electivos ({stNivel})</h4>
+                      {availableHorarios.map(h => {
+                        const hElectives = electives.filter(e => e.nivel_destino === stNivel && String(e.horario_id) === String(h.id) && e.activo);
+                        return (
+                          <div key={h.id} className="form-group" style={{ marginBottom: 0 }}>
+                            <label style={{ fontSize: '12px' }}>{h.nombre}</label>
+                            <select
+                              value={manualInscriptionElectivos[h.id] || ''}
+                              onChange={(e) => setManualInscriptionElectivos({ ...manualInscriptionElectivos, [h.id]: e.target.value })}
+                              style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                            >
+                              <option value="">-- Elija un electivo --</option>
+                              {hElectives.map(el => {
+                                const areaCode = getAreaCode(el.area_id);
+                                return (
+                                  <option key={el.id} value={el.id}>[Área {areaCode}] {el.nombre}</option>
+                                );
+                              })}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
+                <div className="form-group" style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    id="manualSendEmail"
+                    checked={manualInscriptionSendEmail}
+                    onChange={(e) => setManualInscriptionSendEmail(e.target.checked)}
+                  />
+                  <label htmlFor="manualSendEmail" style={{ fontSize: '13px', cursor: 'pointer', margin: 0 }}>
+                    Enviar comprobante por correo automático
+                  </label>
+                </div>
+              </div>
+              <div className="modal-actions" style={{ marginTop: '30px' }}>
+                <button type="button" className="laap-btn-text" onClick={() => setShowManualInscriptionModal(false)} disabled={isSubmittingManualInscription}>
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  className="laap-btn-primary" 
+                  onClick={handleManualInscriptionSubmit}
+                  disabled={isSubmittingManualInscription || !manualInscriptionModalidad}
+                >
+                  {isSubmittingManualInscription ? 'Guardando...' : 'Inscribir Alumno'}
+                </button>
+              </div>
             </div>
           </div>
         )}
