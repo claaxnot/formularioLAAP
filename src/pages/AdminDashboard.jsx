@@ -792,6 +792,74 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleReenviarCorreosMasivos = async () => {
+    const alumnosConError = students.filter(st => st.estado_correo === 'error' && st.ya_postulo);
+    if (alumnosConError.length === 0) {
+      showToast("No hay correos con estado 'error' para reenviar.", "info");
+      return;
+    }
+
+    if (!window.confirm(`¿Estás seguro de intentar reenviar el comprobante a ${alumnosConError.length} estudiante(s) con error?`)) {
+      return;
+    }
+
+    showToast(`Iniciando reenvío masivo a ${alumnosConError.length} estudiantes...`, "info");
+    let exitosos = 0;
+    let fallidos = 0;
+
+    for (const st of alumnosConError) {
+      try {
+        const isTP = eleccionesModalidad.some(m => m.alumno_id === st.id && m.modalidad === 'tecnico_profesional_gastronomia');
+        const isCH = eleccionesModalidad.some(m => m.alumno_id === st.id && m.modalidad === 'cientifico_humanista');
+        
+        const modalidad = isTP ? 'tecnico_profesional_gastronomia' : (isCH ? 'cientifico_humanista' : null);
+        if (!modalidad) throw new Error("Modalidad no declarada");
+
+        const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
+        const electivesPayload = stPosts.map(p => {
+          const el = electives.find(e => e.id === p.electivo_id);
+          const hor = horarios.find(h => h.id === p.horario_id);
+          const area = areas.find(a => el && a.id === el.area_id);
+          return {
+            nombre: el ? el.nombre : 'Desconocido',
+            horario_nombre: hor ? hor.nombre : 'Desconocido',
+            area_codigo: area ? area.codigo : 'Desconocido'
+          };
+        });
+
+        const payload = {
+          alumno_id: st.id,
+          email: st.correo,
+          nombre_completo: st.nombre_completo,
+          rut: st.rut,
+          curso_actual: st.curso_actual,
+          nivel_destino: (st.curso_actual && st.curso_actual.startsWith('2')) ? '3M' : '4M',
+          modalidad: modalidad,
+          correo_apoderado_1: st.correo_apoderado_1,
+          correo_apoderado_2: st.correo_apoderado_2,
+          electivos: electivesPayload
+        };
+        
+        const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+          body: payload
+        });
+
+        if (error || (data && !data.success)) {
+          throw new Error("Edge Function Error");
+        }
+
+        await supabase.from('alumnos').update({ estado_correo: 'enviado' }).eq('id', st.id);
+        exitosos++;
+      } catch (e) {
+        console.error(`Error masivo a ${st.nombre_completo}:`, e);
+        fallidos++;
+      }
+    }
+
+    fetchAdminData();
+    showToast(`Reenvío completado: ${exitosos} correctos, ${fallidos} fallidos.`, exitosos > 0 ? "success" : "error");
+  };
+
   // Eliminar Postulación (Admin Override real - libera todos los cupos del alumno para permitirle postular de nuevo)
   const handleDeletePostulacion = async (postItem) => {
     const studentName = getAlumnoName(postItem.alumno_id);
@@ -2764,8 +2832,20 @@ export default function AdminDashboard() {
           return (
             <div className="admin-tab-content animate-fadeIn">
               <div className="admin-section-card">
-                <h2>Roster General de Estudiantes</h2>
-                <p>Visualización del estado de postulación por cada estudiante registrado en la matrícula.</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <h2>Roster General de Estudiantes</h2>
+                    <p>Visualización del estado de postulación por cada estudiante registrado en la matrícula.</p>
+                  </div>
+                  <button
+                    className="laap-btn-warning"
+                    onClick={handleReenviarCorreosMasivos}
+                    style={{ fontSize: '0.85rem', padding: '6px 12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    title="Reenviar comprobante a todos los alumnos con estado de correo 'error'"
+                  >
+                    <Mail size={16} /> Reenviar Correos Fallidos
+                  </button>
+                </div>
 
                 {/* Filtros de Roster */}
                 <div style={{
