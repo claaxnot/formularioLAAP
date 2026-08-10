@@ -2492,7 +2492,13 @@ export default function AdminDashboard() {
                       });
                       
                       const renderGroup = (nivel) => {
-                        return sorted.filter(e => e.nivel_destino === nivel).map(el => {
+                        const items = sorted
+                          .filter(e => e.nivel_destino === nivel)
+                          .filter(e => waitlist.some(w => String(w.electivo_id) === String(e.id)));
+                        
+                        if (items.length === 0) return null;
+
+                        return items.map(el => {
                           const hor = horarios.find(h => String(h.id) === String(el.horario_id));
                           const hName = hor ? hor.nombre : `H${el.horario_id}`;
                           const areaCode = getAreaCode(el.area_id);
@@ -2504,14 +2510,21 @@ export default function AdminDashboard() {
                         });
                       };
 
+                      const group3M = renderGroup('3M');
+                      const group4M = renderGroup('4M');
+
                       return (
                         <>
-                          <optgroup label="Asignaturas 3° Medio">
-                            {renderGroup('3M')}
-                          </optgroup>
-                          <optgroup label="Asignaturas 4° Medio">
-                            {renderGroup('4M')}
-                          </optgroup>
+                          {(waitlistLevelFilter === 'all' || waitlistLevelFilter === '3M') && group3M && (
+                            <optgroup label="Asignaturas 3° Medio">
+                              {group3M}
+                            </optgroup>
+                          )}
+                          {(waitlistLevelFilter === 'all' || waitlistLevelFilter === '4M') && group4M && (
+                            <optgroup label="Asignaturas 4° Medio">
+                              {group4M}
+                            </optgroup>
+                          )}
                         </>
                       );
                     })()}
