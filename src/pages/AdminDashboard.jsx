@@ -72,6 +72,9 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [rosterSearchQuery, setRosterSearchQuery] = useState('');
   const [rosterCursoFilter, setRosterCursoFilter] = useState('all');
+  const [rosterHorario1Filter, setRosterHorario1Filter] = useState('all');
+  const [rosterHorario2Filter, setRosterHorario2Filter] = useState('all');
+  const [rosterHorario3Filter, setRosterHorario3Filter] = useState('all');
 
   // Edit Student Postulacion States
   const [editingPostulacion, setEditingPostulacion] = useState(null);
@@ -127,8 +130,19 @@ export default function AdminDashboard() {
     horario_id: '',
     area_id: '',
     activo: true,
+    activo: true,
     nivel_destino: '3M'
   });
+
+  const formatChileanTime = (dateStr) => {
+    if (!dateStr) return '—';
+    const utcStr = (dateStr.endsWith('Z') || dateStr.includes('+')) ? dateStr : dateStr + 'Z';
+    return new Date(utcStr).toLocaleString('es-CL', {
+      timeZone: 'America/Santiago',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    });
+  };
   useEffect(() => {
     fetchAdminData(true);
   }, []);
@@ -990,7 +1004,7 @@ export default function AdminDashboard() {
         ["REPORTES Y ROSTER DE POSTULACIÓN ELECTIVOS 2026", "", ""],
         ["Liceo Arturo Alessandri Palma - Providencia", "", ""],
         ["Nivel Destino:", nivelDestino === '3M' ? "3° Medio (3M)" : "4° Medio (4M)", ""],
-        ["Fecha de Generación:", new Date().toLocaleString('es-CL'), ""],
+        ["Fecha de Generación:", new Date().toLocaleString('es-CL', { timeZone: 'America/Santiago' }), ""],
         ["", "", ""],
         ["Asignatura / Modalidad", "Estudiantes Inscritos / Seleccionados", "En Lista de Espera"]
       ];
@@ -1038,12 +1052,13 @@ export default function AdminDashboard() {
 
         // Encabezado de tabla
         sheetRows.push([
-          "Nº", "Nº Lista", "RUT", "ESTUDIANTE", "CURSO", "CORREO", ...classColumns
+          "Nº", "Nº Lista", "RUT", "ESTUDIANTE", "CURSO", "CORREO", "HORA INGRESO", ...classColumns
         ]);
 
         elPosts.forEach((post, index) => {
           const st = students.find(s => s.id === post.alumno_id);
           if (st) {
+            const dateStr = formatChileanTime(post.created_at);
             sheetRows.push([
               index + 1,
               "", // Nº Lista en blanco
@@ -1051,6 +1066,7 @@ export default function AdminDashboard() {
               formatNombre(st.nombre_completo).toUpperCase(),
               st.curso_actual || "—",
               st.correo || "—",
+              dateStr,
               ...Array(30).fill("")
             ]);
           }
@@ -1060,12 +1076,13 @@ export default function AdminDashboard() {
         const elWaitlist = waitlist.filter(w => w.electivo_id === el.id);
         if (elWaitlist.length > 0) {
           sheetRows.push([]); // Fila vacía para separar
-          sheetRows.push(["LISTA DE ESPERA", "", "", "", "", "", ...Array(30).fill("")]);
-          sheetRows.push(["Nº", "Nº Lista", "RUT", "ESTUDIANTE", "CURSO", "CORREO", ...classColumns]);
+          sheetRows.push(["LISTA DE ESPERA", "", "", "", "", "", "", ...Array(30).fill("")]);
+          sheetRows.push(["Nº", "Nº Lista", "RUT", "ESTUDIANTE", "CURSO", "CORREO", "HORA INGRESO", ...classColumns]);
           
           elWaitlist.forEach((w, index) => {
             const st = students.find(s => s.id === w.alumno_id);
             if (st) {
+              const dateStr = formatChileanTime(w.created_at);
               sheetRows.push([
                 index + 1,
                 "",
@@ -1073,6 +1090,7 @@ export default function AdminDashboard() {
                 formatNombre(st.nombre_completo).toUpperCase(),
                 st.curso_actual || "—",
                 st.correo || "—",
+                dateStr,
                 ...Array(30).fill("")
               ]);
             }
@@ -1116,7 +1134,7 @@ export default function AdminDashboard() {
       tpRecords.forEach((rec, index) => {
         const st = students.find(s => s.id === rec.alumno_id);
         if (st) {
-          const dateStr = rec.created_at ? new Date(rec.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+          const dateStr = formatChileanTime(rec.created_at);
           tpRows.push([
             index + 1,
             st.rut || "—",
@@ -1585,8 +1603,8 @@ export default function AdminDashboard() {
           'Correo Apoderado': ac.correo_destinatario || '—',
           'Tipo de Apoderado': ac.tipo_confirmacion === 'apoderado_1' ? 'Principal (1)' : 'Secundario (2)',
           'Estado': ac.confirmado ? 'CONFIRMADO' : 'PENDIENTE',
-          'Fecha Confirmación': ac.confirmado_at ? new Date(ac.confirmado_at).toLocaleString('es-CL') : '—',
-          'Fecha Creación Envío': ac.created_at ? new Date(ac.created_at).toLocaleString('es-CL') : '—',
+          'Fecha Confirmación': formatChileanTime(ac.confirmado_at),
+          'Fecha Creación Envío': formatChileanTime(ac.created_at),
           'Navegador/Dispositivo': ac.user_agent || '—',
           'Dirección IP': ac.ip_address || '—'
         };
@@ -2294,7 +2312,7 @@ export default function AdminDashboard() {
                                   Área {getAreaCode(matchedElective.area_id || 'A')}
                                 </span>
                               </td>
-                              <td>{new Date(p.created_at).toLocaleString('es-CL')}</td>
+                              <td>{formatChileanTime(p.created_at)}</td>
                               <td>
                                 <div style={{ display: 'flex', gap: '6px' }}>
                                   <button
@@ -2496,7 +2514,7 @@ export default function AdminDashboard() {
                             <td>{getAlumnoCurso(w.alumno_id)}</td>
                             <td><strong>{getElectiveName(w.electivo_id)}</strong></td>
                             <td>{getScheduleName(targetHorarioId || 1)}</td>
-                            <td>{new Date(w.created_at.endsWith('Z') || w.created_at.includes('+') ? w.created_at : w.created_at + 'Z').toLocaleString('es-CL')}</td>
+                            <td>{formatChileanTime(w.created_at)}</td>
                             <td>
                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                 <button
@@ -2734,7 +2752,13 @@ export default function AdminDashboard() {
               (st.rut || '').toLowerCase().includes(query) ||
               (st.correo || '').toLowerCase().includes(query);
             const matchesCurso = rosterCursoFilter === 'all' || st.curso_actual === rosterCursoFilter;
-            return matchesSearch && matchesCurso;
+
+            const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
+            const matchesH1 = rosterHorario1Filter === 'all' || stPosts.some(p => String(p.electivo_id) === String(rosterHorario1Filter));
+            const matchesH2 = rosterHorario2Filter === 'all' || stPosts.some(p => String(p.electivo_id) === String(rosterHorario2Filter));
+            const matchesH3 = rosterHorario3Filter === 'all' || stPosts.some(p => String(p.electivo_id) === String(rosterHorario3Filter));
+
+            return matchesSearch && matchesCurso && matchesH1 && matchesH2 && matchesH3;
           });
 
           return (
@@ -2807,6 +2831,42 @@ export default function AdminDashboard() {
                       ))}
                     </select>
                   </div>
+
+                  {/* Filtros de Horarios */}
+                  {sortedHorarios.slice(0, 3).map((h, idx) => {
+                    const filterValue = idx === 0 ? rosterHorario1Filter : idx === 1 ? rosterHorario2Filter : rosterHorario3Filter;
+                    const setFilter = idx === 0 ? setRosterHorario1Filter : idx === 1 ? setRosterHorario2Filter : setRosterHorario3Filter;
+                    const electivesForHorario = electives.filter(e => e.horario_id === h.id);
+
+                    return (
+                      <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#9ca3af' }}>{h.nombre}:</span>
+                        <select
+                          value={filterValue}
+                          onChange={(e) => setFilter(e.target.value)}
+                          style={{
+                            padding: '8px 12px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                            color: 'white',
+                            fontSize: '13px',
+                            fontWeight: 'bold',
+                            cursor: 'pointer',
+                            maxWidth: '180px',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          <option value="all" style={{ backgroundColor: '#1f2937' }}>Cualquiera</option>
+                          {electivesForHorario.map(el => (
+                            <option key={el.id} value={el.id} style={{ backgroundColor: '#1f2937' }}>
+                              [{el.nivel_destino}] {el.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  })}
                 </div>
 
                 <div className="table-responsive">
@@ -3044,7 +3104,7 @@ export default function AdminDashboard() {
           const handleExportModalidadTP = () => {
             const exportData = tpStudentsList.map(row => {
               const st = students.find(s => s.id === row.alumno_id) || {};
-              const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+              const dateStr = formatChileanTime(row.created_at);
               return {
                 "RUT": st.rut || '—',
                 "Nombre": st.nombre_completo || 'Desconocido',
@@ -3142,7 +3202,7 @@ export default function AdminDashboard() {
                           const modLabel = 'Técnico Profesional (Gastronomía)';
                           const badgeColor = 'rgba(16, 185, 129, 0.15)';
                           const badgeText = '#10b981';
-                          const dateStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+                          const dateStr = formatChileanTime(row?.created_at);
 
                           return (
                             <tr key={row.id || idx}>
@@ -3662,7 +3722,7 @@ export default function AdminDashboard() {
                     ) : (
                       filteredAcuseRecibos.map((row) => {
                         const student = students.find(s => s.id === row.alumno_id) || {};
-                        const dateStr = row.confirmado_at ? new Date(row.confirmado_at).toLocaleString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+                        const dateStr = formatChileanTime(row.confirmado_at);
                         const createdStr = row.created_at ? new Date(row.created_at).toLocaleDateString('es-CL') : '—';
 
                         return (
