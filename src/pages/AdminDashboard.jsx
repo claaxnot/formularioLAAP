@@ -2831,42 +2831,6 @@ export default function AdminDashboard() {
                       ))}
                     </select>
                   </div>
-
-                  {/* Filtros de Horarios */}
-                  {sortedHorarios.slice(0, 3).map((h, idx) => {
-                    const filterValue = idx === 0 ? rosterHorario1Filter : idx === 1 ? rosterHorario2Filter : rosterHorario3Filter;
-                    const setFilter = idx === 0 ? setRosterHorario1Filter : idx === 1 ? setRosterHorario2Filter : setRosterHorario3Filter;
-                    const electivesForHorario = electives.filter(e => e.horario_id === h.id);
-
-                    return (
-                      <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#9ca3af' }}>{h.nombre}:</span>
-                        <select
-                          value={filterValue}
-                          onChange={(e) => setFilter(e.target.value)}
-                          style={{
-                            padding: '8px 12px',
-                            borderRadius: '6px',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
-                            color: 'white',
-                            fontSize: '13px',
-                            fontWeight: 'bold',
-                            cursor: 'pointer',
-                            maxWidth: '180px',
-                            textOverflow: 'ellipsis'
-                          }}
-                        >
-                          <option value="all" style={{ backgroundColor: '#1f2937' }}>Cualquiera</option>
-                          {electivesForHorario.map(el => (
-                            <option key={el.id} value={el.id} style={{ backgroundColor: '#1f2937' }}>
-                              [{el.nivel_destino}] {el.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    );
-                  })}
                 </div>
 
                 <div className="table-responsive">
@@ -2896,9 +2860,42 @@ export default function AdminDashboard() {
                         <th>Curso</th>
                         <th>Modalidad</th>
                         <th>Estado Formulario</th>
-                        {sortedHorarios.map(h => (
-                          <th key={h.id}>{h.nombre}</th>
-                        ))}
+                        {sortedHorarios.map((h, idx) => {
+                          const filterValue = idx === 0 ? rosterHorario1Filter : idx === 1 ? rosterHorario2Filter : rosterHorario3Filter;
+                          const setFilter = idx === 0 ? setRosterHorario1Filter : idx === 1 ? setRosterHorario2Filter : setRosterHorario3Filter;
+                          const electivesForHorario = electives.filter(e => e.horario_id === h.id);
+
+                          return (
+                            <th key={h.id} style={{ verticalAlign: 'top', paddingTop: '12px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <span style={{ textAlign: 'center' }}>{h.nombre}</span>
+                                <select
+                                  value={filterValue}
+                                  onChange={(e) => setFilter(e.target.value)}
+                                  style={{
+                                    padding: '4px 6px',
+                                    borderRadius: '4px',
+                                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                                    color: 'var(--text-primary)',
+                                    fontSize: '11px',
+                                    fontWeight: 'normal',
+                                    cursor: 'pointer',
+                                    width: '100%',
+                                    textOverflow: 'ellipsis'
+                                  }}
+                                >
+                                  <option value="all">Cualquiera</option>
+                                  {electivesForHorario.map(el => (
+                                    <option key={el.id} value={el.id} style={{ backgroundColor: '#1f2937', color: 'white' }}>
+                                      {el.nombre}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </th>
+                          );
+                        })}
                         {sortedHorarios.length === 0 && (
                           <>
                             <th>Horario 1</th>
@@ -2906,7 +2903,7 @@ export default function AdminDashboard() {
                             <th>Horario 3</th>
                           </>
                         )}
-                        <th>Acción</th>
+                        <th style={{ verticalAlign: 'top', paddingTop: '12px' }}>Acción</th>
                       </tr>
                     </thead>
                     <tbody>
