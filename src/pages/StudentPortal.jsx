@@ -242,6 +242,7 @@ export default function StudentPortal() {
             cupos_maximos: item.cupos_maximos !== undefined ? item.cupos_maximos : 15,
             cupos_ocupados: item.cupos_ocupados || 0,
             cupos_disponibles: item.cupos_disponibles !== undefined ? item.cupos_disponibles : 15,
+            cupos_en_reserva: item.cupos_en_reserva || 0,
             horario_id: order,
             horario_uuid: item.horario_id, // Preservar el UUID real!
             horario_orden: order, // Preservar el orden real!
@@ -332,7 +333,11 @@ export default function StudentPortal() {
       await fetchData(false);
     } catch (err) {
       console.error("Error en reserva transaccional:", err);
-      showToast("⚠️ No se pudo reservar: " + err.message, 'error');
+      if (err.message && (err.message.includes('cupo') || err.message.includes('lleno') || err.message.includes('disponible'))) {
+        showToast("¡Ups! 🏃 Otro estudiante acaba de tomar este cupo hace unos segundos. Los cupos en este electivo son muy cotizados. Puedes intentar con otro electivo o anotarte en la Lista de Espera.", 'error');
+      } else {
+        showToast("⚠️ No se pudo reservar: " + err.message, 'error');
+      }
 
       // 4. Reversión automática del estado visual (Rollback)
       setSelectedElectives(prev => {
@@ -370,7 +375,7 @@ export default function StudentPortal() {
 
   // Unirse a la lista de espera real en Supabase
   const handleJoinWaitlist = async (elective) => {
-    if (alreadySubmitted || !isProcessOpen) return;
+    if (!isProcessOpen) return;
 
     showConfirm(
       `¿Deseas inscribirte en la Lista de Espera para "${elective.nombre}"?`,
@@ -1082,7 +1087,9 @@ export default function StudentPortal() {
               No hay electivos disponibles para este proceso en este momento.
             </p>
           </div>
-        ) : alreadySubmitted ? (
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', width: '100%' }}>
+            {alreadySubmitted && (
           /* Mensaje de ya postulado */
           <div className="portal-submitted-notice animate-scaleIn" style={{
             maxWidth: '850px',
@@ -1148,9 +1155,11 @@ export default function StudentPortal() {
               </div>
             </div>
           </div>
-        ) : (
-          /* Formulario Interactivo */
-          <form onSubmit={handleSubmit} className="portal-selection-form animate-fadeIn">
+            )}
+            
+            {!alreadySubmitted && (
+              /* Formulario Interactivo */
+              <form onSubmit={handleSubmit} className="portal-selection-form animate-fadeIn">
             {/* Panel flotante de elecciones */}
             <div className="selection-summary-panel">
               <div className="panel-title">
@@ -1206,6 +1215,18 @@ export default function StudentPortal() {
                 {!isProcessOpen ? 'Proceso Cerrado' : submitting ? 'Enviando selección...' : 'Guardar y Finalizar Selección'}
               </button>
             </div>
+            </form>
+            )}
+
+            {alreadySubmitted && (
+              <div style={{ marginTop: '20px', textAlign: 'center', animation: 'fadeIn 0.5s ease-in-out' }}>
+                <h3 style={{ color: '#fff', marginBottom: '8px', fontSize: '20px' }}>Explorar Listas de Espera</h3>
+                <p style={{ color: '#9ca3af', fontSize: '15px' }}>
+                  Aún puedes inscribirte en las listas de espera de otros electivos que estén llenos. 
+                  Si se libera un cupo, UTP podría evaluar un cambio.
+                </p>
+              </div>
+            )}
 
             {/* Listado de electivos por Horarios */}
             <div className="schedules-workspace">
@@ -1226,13 +1247,14 @@ export default function StudentPortal() {
                         const isWaitlisted = waitlistStatus[el.id] || false;
                         const isExpanded = expandedElectives[el.id] || false;
                         const isReservingThisBlock = reservingScheduleId === el.horario_uuid;
+                        const isDisabled = isFull || !isProcessOpen || isReservingThisBlock || (alreadySubmitted && !isSelected);
 
                         return (
                           <div
                             key={el.id}
-                            className={`elective-card ${isSelected ? 'selected' : ''} ${isFull || !isProcessOpen || isReservingThisBlock ? 'disabled' : ''} ${isExpanded ? 'details-expanded' : 'details-collapsed'}`}
+                            className={`elective-card ${isSelected ? 'selected' : ''} ${isDisabled ? 'disabled' : ''} ${isExpanded ? 'details-expanded' : 'details-collapsed'}`}
                             style={{ '--horario-bg': h.color, position: 'relative' }}
-                            onClick={() => isProcessOpen && !isFull && !isReservingThisBlock && handleSelect(h.nombre, el)}
+                            onClick={() => !isDisabled && handleSelect(h.nombre, el)}
                           >
                             {isReservingThisBlock && isSelected && (
                               <div style={{
@@ -1258,8 +1280,14 @@ export default function StudentPortal() {
                               </span>
                               <span className="mobile-seats-pill">
                                 {el.cupos_disponibles} cupos disp.
+                                {el.cupos_en_reserva > 0 && <span style={{ color: '#fbbf24', marginLeft: '4px' }}>(+{el.cupos_en_reserva} resv.)</span>}
                               </span>
-                              <span className={`status-pill ${isFull ? 'full' : 'available'}`}>
+                              {el.cupos_disponibles < 5 && el.cupos_disponibles > 0 && (
+                                <span className="status-pill" style={{ backgroundColor: '#ef4444', color: 'white', borderColor: '#ef4444', animation: 'pulse 2s infinite' }}>
+                                  🔥 Últimos Cupos
+                                </span>
+                              )}
+                              <span className={`status-pill ${isFull ? 'full' : 'available'}`} style={{ display: el.cupos_disponibles < 5 && el.cupos_disponibles > 0 ? 'none' : '' }}>
                                 {isFull ? 'Sin Vacantes' : 'Disponible'}
                               </span>
                             </div>
@@ -1284,9 +1312,16 @@ export default function StudentPortal() {
                               <div className="elective-footer">
                                 <span className="teacher-info">Prof: {el.profesor || 'Docente UTP'}</span>
 
-                                <div className="seats-info">
-                                  <Users size={14} />
-                                  <span>{el.cupos_ocupados} / {el.cupos_maximos} cupos</span>
+                                <div className="seats-info" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <Users size={14} />
+                                    <span>{el.cupos_ocupados} / {el.cupos_maximos} cupos</span>
+                                  </div>
+                                  {el.cupos_en_reserva > 0 && (
+                                    <span style={{ fontSize: '11px', color: '#fbbf24', fontWeight: 'bold' }}>
+                                      ⏳ {el.cupos_en_reserva} en proceso de reserva
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
@@ -1303,6 +1338,11 @@ export default function StudentPortal() {
                               <div className="waitlist-card-action" onClick={(e) => e.stopPropagation()}>
                                 <p className="waitlist-notice">
                                   Esta asignatura no tiene vacantes libres. Puedes inscribirte en la lista de espera para optar a un cupo libre por desestimación.
+                                  {el.cupos_en_reserva > 0 && (
+                                    <span style={{ display: 'block', marginTop: '6px', color: '#fbbf24', fontWeight: 'bold' }}>
+                                      ⏳ Actualmente hay {el.cupos_en_reserva} cupo(s) retenidos temporalmente (por 1 minuto) por otro estudiante en proceso de inscripción. Vuelve a revisar en un momento, o únete a la lista de espera.
+                                    </span>
+                                  )}
                                 </p>
                                 {isWaitlisted ? (
                                   <button type="button" className="laap-btn-success full-width" disabled>
@@ -1328,7 +1368,7 @@ export default function StudentPortal() {
                               <>
                                 {/* Desktop Indicator */}
                                 <div className="select-indicator desktop-only">
-                                  {!isProcessOpen ? 'Proceso Cerrado' : isSelected ? 'Asignatura Seleccionada' : 'Haga clic para seleccionar'}
+                                  {!isProcessOpen ? 'Proceso Cerrado' : alreadySubmitted ? 'Formulario Bloqueado' : isSelected ? 'Asignatura Seleccionada' : 'Haga clic para seleccionar'}
                                 </div>
 
                                 {/* Mobile Action Button */}
@@ -1342,8 +1382,8 @@ export default function StudentPortal() {
                                     <button
                                       type="button"
                                       className="select-compact-btn"
-                                      disabled={!isProcessOpen}
-                                      onClick={() => isProcessOpen && handleSelect(h.nombre, el)}
+                                      disabled={!isProcessOpen || alreadySubmitted}
+                                      onClick={() => !alreadySubmitted && isProcessOpen && handleSelect(h.nombre, el)}
                                     >
                                       Seleccionar
                                     </button>
@@ -1359,7 +1399,7 @@ export default function StudentPortal() {
                 );
               })}
             </div>
-          </form>
+          </div>
         )}
       </main>
     </div>
