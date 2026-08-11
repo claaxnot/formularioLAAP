@@ -64,6 +64,8 @@ export default function AdminDashboard() {
   const [statsFilter, setStatsFilter] = useState('all'); // 'all', '3M', '4M'
   const [waitlistFilter, setWaitlistFilter] = useState('all'); // 'all', o id_electivo
   const [waitlistLevelFilter, setWaitlistLevelFilter] = useState('all'); // 'all', '3M', '4M'
+  const [waitlistTableSearchQuery, setWaitlistTableSearchQuery] = useState('');
+  const [postulacionesTableSearchQuery, setPostulacionesTableSearchQuery] = useState('');
   const [acuseRecibos, setAcuseRecibos] = useState([]);
   const [acuseFilter, setAcuseFilter] = useState('all'); // 'all', 'pending', 'confirmed'
   const [acuseSearchQuery, setAcuseSearchQuery] = useState('');
@@ -2333,9 +2335,10 @@ export default function AdminDashboard() {
                     <Search size={16} />
                     <input
                       type="text"
-                      placeholder="Buscar alumno..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar por nombre, RUT o correo..."
+                      value={postulacionesTableSearchQuery}
+                      onChange={(e) => setPostulacionesTableSearchQuery(e.target.value)}
+                      style={{ width: '220px' }}
                     />
                   </div>
                 </div>
@@ -2361,7 +2364,14 @@ export default function AdminDashboard() {
                       </tr>
                     ) : (
                       postulaciones
-                        .filter(p => getAlumnoName(p.alumno_id).toLowerCase().includes(searchQuery.toLowerCase()))
+                        .filter(p => {
+                          const query = postulacionesTableSearchQuery.trim().toLowerCase();
+                          if (!query) return true;
+                          const name = getAlumnoName(p.alumno_id).toLowerCase();
+                          const rut = getAlumnoRut(p.alumno_id).toLowerCase();
+                          const email = getAlumnoEmail(p.alumno_id).toLowerCase();
+                          return name.includes(query) || rut.includes(query) || email.includes(query);
+                        })
                         .map(p => {
                           const blockColor = String(p.horario_id) === '1' ? '#fff6db' : String(p.horario_id) === '2' ? '#f7e7ef' : '#e8f1fb';
                           const matchedElective = electives.find(e => e.id === p.electivo_id) || {};
@@ -2424,6 +2434,16 @@ export default function AdminDashboard() {
                   <p style={{ margin: 0 }}>Seguimiento de estudiantes en cola de espera por falta de vacante.</p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div className="search-box">
+                    <Search size={16} />
+                    <input
+                      type="text"
+                      placeholder="Buscar por nombre, RUT o correo..."
+                      value={waitlistTableSearchQuery}
+                      onChange={(e) => setWaitlistTableSearchQuery(e.target.value)}
+                      style={{ width: '220px' }}
+                    />
+                  </div>
                   <button
                     className="laap-btn-primary"
                     onClick={() => {
@@ -2559,6 +2579,17 @@ export default function AdminDashboard() {
                       // 2. Filtrar por Asignatura Específica
                       if (waitlistFilter !== 'all') {
                         filteredWaitlist = filteredWaitlist.filter(w => String(w.electivo_id) === String(waitlistFilter));
+                      }
+
+                      // 3. Filtrar por Búsqueda de Texto
+                      if (waitlistTableSearchQuery) {
+                        const query = waitlistTableSearchQuery.trim().toLowerCase();
+                        filteredWaitlist = filteredWaitlist.filter(w => {
+                          const name = getAlumnoName(w.alumno_id).toLowerCase();
+                          const rut = getAlumnoRut(w.alumno_id).toLowerCase();
+                          const email = getAlumnoEmail(w.alumno_id).toLowerCase();
+                          return name.includes(query) || rut.includes(query) || email.includes(query);
+                        });
                       }
 
                       if (filteredWaitlist.length === 0) {
