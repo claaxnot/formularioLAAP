@@ -4383,10 +4383,57 @@ export default function AdminDashboard() {
                   </div>
                   <div style={{ backgroundColor: '#dcfce7', padding: '12px', borderRadius: '6px', border: '1px solid #86efac' }}>
                     <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#166534', fontWeight: 'bold' }}>Nuevo Electivo (Lista Espera)</p>
-                    <p style={{ margin: 0, color: '#14532d' }}>
-                      {waitlistAssignData.nuevo_electivo_nombre}
-                      {waitlistAssignData.nuevo_electivo_area && <span style={{ fontSize: '12px', fontStyle: 'italic', marginLeft: '6px', opacity: 0.8 }}>(Área {waitlistAssignData.nuevo_electivo_area})</span>}
-                    </p>
+                    {(() => {
+                      // El electivo original de la lista de espera para extraer el nivel
+                      // Nota: waitlistAssignData contiene el ID original asignado inicialmente
+                      const originalEl = electives.find(e => e.id === waitlistAssignData.nuevo_electivo_id) || electives.find(e => e.nombre === waitlistAssignData.nuevo_electivo_nombre);
+                      const currentNivel = originalEl ? originalEl.nivel_destino : '3M';
+
+                      const alternativeElectives = electives.filter(e => 
+                        String(e.horario_id) === String(waitlistAssignData.horario_id) &&
+                        e.nivel_destino === currentNivel &&
+                        e.activo === true
+                      );
+
+                      return (
+                        <select
+                          className="laap-input"
+                          value={waitlistAssignData.nuevo_electivo_id}
+                          onChange={(e) => {
+                            const newElId = e.target.value;
+                            const newEl = electives.find(el => String(el.id) === String(newElId));
+                            if (newEl) {
+                              setWaitlistAssignData(prev => ({
+                                ...prev,
+                                nuevo_electivo_id: newEl.id,
+                                nuevo_electivo_nombre: newEl.nombre,
+                                nuevo_electivo_area: getAreaCode(newEl.area_id)
+                              }));
+                            }
+                          }}
+                          style={{ 
+                            width: '100%', 
+                            fontSize: '13px', 
+                            padding: '6px', 
+                            border: '1px solid #86efac', 
+                            borderRadius: '4px', 
+                            backgroundColor: '#f0fdf4', 
+                            color: '#14532d',
+                            outline: 'none',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {alternativeElectives.map(e => {
+                            const areaCode = getAreaCode(e.area_id);
+                            return (
+                              <option key={e.id} value={e.id}>
+                                {e.nombre} (Área {areaCode})
+                              </option>
+                            );
+                          })}
+                        </select>
+                      );
+                    })()}
                   </div>
                 </div>
                 
