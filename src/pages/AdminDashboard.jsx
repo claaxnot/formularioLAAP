@@ -66,6 +66,8 @@ export default function AdminDashboard() {
   const [waitlistLevelFilter, setWaitlistLevelFilter] = useState('all'); // 'all', '3M', '4M'
   const [waitlistTableSearchQuery, setWaitlistTableSearchQuery] = useState('');
   const [postulacionesTableSearchQuery, setPostulacionesTableSearchQuery] = useState('');
+  const [mantenimientoStudentSearch, setMantenimientoStudentSearch] = useState('');
+  const [mantenimientoCursoFilter, setMantenimientoCursoFilter] = useState('all');
   const [acuseRecibos, setAcuseRecibos] = useState([]);
   const [acuseFilter, setAcuseFilter] = useState('all'); // 'all', 'pending', 'confirmed'
   const [acuseSearchQuery, setAcuseSearchQuery] = useState('');
@@ -1250,6 +1252,22 @@ export default function AdminDashboard() {
   const handleOpenEditStudentModal = (student) => {
     setEditingStudent({ ...student });
     setShowStudentModal(true);
+  };
+
+  const handleDeleteStudent = async (studentId, studentName) => {
+    if (!window.confirm(`¿ESTÁS SEGURO que deseas eliminar permanentemente al alumno ${studentName}?\n\nEsta acción borrará todas sus postulaciones, confirmaciones y registros del sistema, dejándolo como si nunca hubiera existido.`)) {
+      return;
+    }
+    try {
+      showToast("Eliminando alumno...", "info");
+      const { error } = await supabase.from('alumnos').delete().eq('id', studentId);
+      if (error) throw error;
+      fetchAdminData();
+      showToast(`Alumno ${studentName} eliminado con éxito.`, "success");
+    } catch (e) {
+      console.error("Error al eliminar alumno:", e);
+      showToast("Error al eliminar alumno: " + e.message, "error");
+    }
   };
 
   const handleSaveStudentDetails = async (e) => {
@@ -3730,6 +3748,120 @@ export default function AdminDashboard() {
                 )}
               </div>
             )}
+
+            {/* GESTION DIRECTA DE ALUMNOS */}
+            <div className="admin-section-card" style={{ marginTop: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h2>Gestión Directa de Alumnos</h2>
+                  <p style={{ margin: 0 }}>Listado completo de matrícula para mantenimiento manual (Eliminar alumnos retirados, corregir errores, etc).</p>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '20px',
+                marginTop: '16px'
+              }}>
+                <div className="search-box">
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre, RUT o correo..."
+                    value={mantenimientoStudentSearch}
+                    onChange={(e) => setMantenimientoStudentSearch(e.target.value)}
+                    style={{ width: '250px' }}
+                  />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-secondary)' }}>Curso:</label>
+                  <select
+                    value={mantenimientoCursoFilter}
+                    onChange={(e) => setMantenimientoCursoFilter(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--bg-input)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">Todos los cursos</option>
+                    {Array.from(new Set(students.map(s => s.curso_actual).filter(Boolean))).sort().map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="table-responsive">
+                <table className="laap-admin-table">
+                  <thead>
+                    <tr>
+                      <th>RUT</th>
+                      <th>Nombre</th>
+                      <th>Correo Institucional</th>
+                      <th>Curso</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students.filter(st => {
+                      const query = mantenimientoStudentSearch.trim().toLowerCase();
+                      const matchesSearch = !query || 
+                        (st.nombre_completo || '').toLowerCase().includes(query) || 
+                        (st.rut || '').toLowerCase().includes(query) || 
+                        (st.correo || '').toLowerCase().includes(query);
+                      const matchesCurso = mantenimientoCursoFilter === 'all' || st.curso_actual === mantenimientoCursoFilter;
+                      return matchesSearch && matchesCurso;
+                    }).length === 0 ? (
+                      <tr>
+                        <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)' }}>
+                          No se encontraron alumnos con los filtros actuales.
+                        </td>
+                      </tr>
+                    ) : (
+                      students.filter(st => {
+                        const query = mantenimientoStudentSearch.trim().toLowerCase();
+                        const matchesSearch = !query || 
+                          (st.nombre_completo || '').toLowerCase().includes(query) || 
+                          (st.rut || '').toLowerCase().includes(query) || 
+                          (st.correo || '').toLowerCase().includes(query);
+                        const matchesCurso = mantenimientoCursoFilter === 'all' || st.curso_actual === mantenimientoCursoFilter;
+                        return matchesSearch && matchesCurso;
+                      }).map(st => (
+                        <tr key={st.id}>
+                          <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{st.rut}</td>
+                          <td><strong>{st.nombre_completo}</strong></td>
+                          <td>{st.correo}</td>
+                          <td>{st.curso_actual}</td>
+                          <td>
+                            <button 
+                              className="btn-table-danger" 
+                              onClick={() => handleDeleteStudent(st.id, st.nombre_completo)}
+                              title="Eliminar alumno permanentemente"
+                              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              <Trash2 size={16} /> Eliminar
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
