@@ -4421,7 +4421,7 @@ export default function AdminDashboard() {
                 <p style={{ margin: '0 0 10px 0' }}>Estás a punto de reasignar oficialmente a:</p>
                 <h3 style={{ margin: '0 0 15px 0', color: '#1e293b' }}>{waitlistAssignData.alumno_nombre}</h3>
                 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '15px' }}>
                   <div style={{ backgroundColor: '#fee2e2', padding: '12px', borderRadius: '6px', border: '1px solid #fca5a5' }}>
                     <p style={{ margin: '0 0 5px 0', fontSize: '0.85rem', color: '#991b1b', fontWeight: 'bold' }}>Electivo Actual (Se liberará cupo)</p>
                     <p style={{ margin: 0, color: '#7f1d1d' }}>
