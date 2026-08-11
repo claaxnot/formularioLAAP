@@ -3812,6 +3812,7 @@ export default function AdminDashboard() {
                       <th>Nombre</th>
                       <th>Correo Institucional</th>
                       <th>Curso</th>
+                      <th>Estado</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
@@ -3845,6 +3846,25 @@ export default function AdminDashboard() {
                           <td><strong>{st.nombre_completo}</strong></td>
                           <td>{st.correo}</td>
                           <td>{st.curso_actual}</td>
+                          <td>
+                            {(() => {
+                              const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
+                              const stModRecord = eleccionesModalidad.find(m => m.alumno_id === st.id);
+                              const studentModality = stModRecord ? stModRecord.modalidad : null;
+                              const isTP = studentModality === 'tecnico_profesional_gastronomia';
+                              const hasSubmitted = isTP || stPosts.length > 0;
+                              
+                              if (isTP) {
+                                return <span className="status-pill available" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>TP</span>;
+                              } else if (hasSubmitted) {
+                                return <span className="status-pill available" style={{ fontSize: '10px', padding: '2px 6px' }}>Enviado (CH)</span>;
+                              } else if (studentModality === 'cientifico_humanista') {
+                                return <span className="status-pill full" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>Eligiendo</span>;
+                              } else {
+                                return <span className="status-pill full" style={{ fontSize: '10px', padding: '2px 6px' }}>Pendiente</span>;
+                              }
+                            })()}
+                          </td>
                           <td>
                             <button 
                               className="btn-table-danger" 
