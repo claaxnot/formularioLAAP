@@ -68,6 +68,11 @@ export default function AdminDashboard() {
   const [postulacionesTableSearchQuery, setPostulacionesTableSearchQuery] = useState('');
   const [mantenimientoStudentSearch, setMantenimientoStudentSearch] = useState('');
   const [mantenimientoCursoFilter, setMantenimientoCursoFilter] = useState('all');
+  const [mantenimientoEstadoFilter, setMantenimientoEstadoFilter] = useState('all');
+  const [mantenimientoSelectedStudents, setMantenimientoSelectedStudents] = useState([]);
+  const [showAddStudentModal, setShowAddStudentModal] = useState(false);
+  const [newStudentData, setNewStudentData] = useState({ rut: '', nombre_completo: '', correo: '', curso_actual: '' });
+  const [isAddingStudent, setIsAddingStudent] = useState(false);
   const [acuseRecibos, setAcuseRecibos] = useState([]);
   const [acuseFilter, setAcuseFilter] = useState('all'); // 'all', 'pending', 'confirmed'
   const [acuseSearchQuery, setAcuseSearchQuery] = useState('');
@@ -1262,12 +1267,83 @@ export default function AdminDashboard() {
       showToast("Eliminando alumno...", "info");
       const { error } = await supabase.from('alumnos').delete().eq('id', studentId);
       if (error) throw error;
+      setMantenimientoSelectedStudents(prev => prev.filter(id => id !== studentId));
       fetchAdminData();
       showToast(`Alumno ${studentName} eliminado con éxito.`, "success");
     } catch (e) {
       console.error("Error al eliminar alumno:", e);
       showToast("Error al eliminar alumno: " + e.message, "error");
     }
+  };
+
+  const handleDeleteSelectedStudents = async () => {
+    if (mantenimientoSelectedStudents.length === 0) return;
+    if (!window.confirm(`¿ESTÁS SEGURO que deseas eliminar permanentemente a los ${mantenimientoSelectedStudents.length} alumnos seleccionados?\n\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+    try {
+      showToast(`Eliminando ${mantenimientoSelectedStudents.length} alumnos...`, "info");
+      const { error } = await supabase.from('alumnos').delete().in('id', mantenimientoSelectedStudents);
+      if (error) throw error;
+      setMantenimientoSelectedStudents([]);
+      fetchAdminData();
+      showToast(`Se han eliminado ${mantenimientoSelectedStudents.length} alumnos con éxito.`, "success");
+    } catch (e) {
+      console.error("Error al eliminar alumnos masivamente:", e);
+      showToast("Error al eliminar alumnos: " + e.message, "error");
+    }
+  };
+
+  const handleAddStudent = async (e) => {
+    e.preventDefault();
+    if (!newStudentData.rut || !newStudentData.nombre_completo || !newStudentData.curso_actual) {
+      showToast("Por favor completa los campos obligatorios (RUT, Nombre, Curso).", "warning");
+      return;
+    }
+    
+    // Simple RUT formatting/validation (can be improved based on specific needs)
+    const rutClean = newStudentData.rut.replace(/[^0-9kK]/g, '').toUpperCase();
+    if (rutClean.length < 8) {
+      showToast("RUT inválido. Verifica el formato.", "warning");
+      return;
+    }
+
+    try {
+      setIsAddingStudent(true);
+      showToast("Añadiendo estudiante...", "info");
+      
+      const { error } = await supabase.from('alumnos').insert([{
+        rut: rutClean,
+        nombre_completo: newStudentData.nombre_completo,
+        correo: newStudentData.correo || null,
+        curso_actual: newStudentData.curso_actual
+      }]);
+      
+      if (error) throw error;
+      
+      setShowAddStudentModal(false);
+      setNewStudentData({ rut: '', nombre_completo: '', correo: '', curso_actual: '' });
+      fetchAdminData();
+      showToast("Estudiante añadido con éxito.", "success");
+    } catch (error) {
+      console.error("Error al añadir estudiante:", error);
+      showToast("Error: " + error.message, "error");
+    } finally {
+      setIsAddingStudent(false);
+    }
+  };
+
+  const getStudentStatusString = (st) => {
+    const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
+    const stModRecord = eleccionesModalidad.find(m => m.alumno_id === st.id);
+    const studentModality = stModRecord ? stModRecord.modalidad : null;
+    const isTP = studentModality === 'tecnico_profesional_gastronomia';
+    const hasSubmitted = isTP || stPosts.length > 0;
+    
+    if (isTP) return 'TP';
+    if (hasSubmitted) return 'Enviado (CH)';
+    if (studentModality === 'cientifico_humanista') return 'Eligiendo';
+    return 'Pendiente';
   };
 
   const handleSaveStudentDetails = async (e) => {
@@ -3756,6 +3832,26 @@ export default function AdminDashboard() {
                   <h2>Gestión Directa de Alumnos</h2>
                   <p style={{ margin: 0 }}>Listado completo de matrícula para mantenimiento manual (Eliminar alumnos retirados, corregir errores, etc).</p>
                 </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {mantenimientoSelectedStudents.length > 0 && (
+                    <button 
+                      className="laap-btn-danger" 
+                      onClick={handleDeleteSelectedStudents}
+                      style={{ padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <Trash2 size={16} />
+                      Eliminar ({mantenimientoSelectedStudents.length})
+                    </button>
+                  )}
+                  <button 
+                    className="laap-btn-primary" 
+                    onClick={() => setShowAddStudentModal(true)}
+                    style={{ padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  >
+                    <Plus size={16} />
+                    Añadir Estudiante
+                  </button>
+                </div>
               </div>
 
               <div style={{
@@ -3802,12 +3898,61 @@ export default function AdminDashboard() {
                     ))}
                   </select>
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-secondary)' }}>Estado:</label>
+                  <select
+                    value={mantenimientoEstadoFilter}
+                    onChange={(e) => setMantenimientoEstadoFilter(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--bg-input)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">Todos los estados</option>
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Eligiendo">Eligiendo (CH)</option>
+                    <option value="Enviado (CH)">Enviado (CH)</option>
+                    <option value="TP">TP (Gastronomía)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="table-responsive">
                 <table className="laap-admin-table">
                   <thead>
                     <tr>
+                      <th style={{ width: '40px' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={mantenimientoSelectedStudents.length > 0 && students.length > 0 && mantenimientoSelectedStudents.length === students.filter(st => {
+                            const query = mantenimientoStudentSearch.trim().toLowerCase();
+                            const matchesSearch = !query || (st.nombre_completo || '').toLowerCase().includes(query) || (st.rut || '').toLowerCase().includes(query) || (st.correo || '').toLowerCase().includes(query);
+                            const matchesCurso = mantenimientoCursoFilter === 'all' || st.curso_actual === mantenimientoCursoFilter;
+                            const matchesEstado = mantenimientoEstadoFilter === 'all' || getStudentStatusString(st) === mantenimientoEstadoFilter;
+                            return matchesSearch && matchesCurso && matchesEstado;
+                          }).length}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              const filtered = students.filter(st => {
+                                const query = mantenimientoStudentSearch.trim().toLowerCase();
+                                const matchesSearch = !query || (st.nombre_completo || '').toLowerCase().includes(query) || (st.rut || '').toLowerCase().includes(query) || (st.correo || '').toLowerCase().includes(query);
+                                const matchesCurso = mantenimientoCursoFilter === 'all' || st.curso_actual === mantenimientoCursoFilter;
+                                const matchesEstado = mantenimientoEstadoFilter === 'all' || getStudentStatusString(st) === mantenimientoEstadoFilter;
+                                return matchesSearch && matchesCurso && matchesEstado;
+                              });
+                              setMantenimientoSelectedStudents(filtered.map(st => st.id));
+                            } else {
+                              setMantenimientoSelectedStudents([]);
+                            }
+                          }}
+                        />
+                      </th>
                       <th>RUT</th>
                       <th>Nombre</th>
                       <th>Correo Institucional</th>
@@ -3817,48 +3962,58 @@ export default function AdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {students.filter(st => {
-                      const query = mantenimientoStudentSearch.trim().toLowerCase();
-                      const matchesSearch = !query || 
-                        (st.nombre_completo || '').toLowerCase().includes(query) || 
-                        (st.rut || '').toLowerCase().includes(query) || 
-                        (st.correo || '').toLowerCase().includes(query);
-                      const matchesCurso = mantenimientoCursoFilter === 'all' || st.curso_actual === mantenimientoCursoFilter;
-                      return matchesSearch && matchesCurso;
-                    }).length === 0 ? (
-                      <tr>
-                        <td colSpan="5" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)' }}>
-                          No se encontraron alumnos con los filtros actuales.
-                        </td>
-                      </tr>
-                    ) : (
-                      students.filter(st => {
+                    {(() => {
+                      const filteredStudentsMantenimiento = students.filter(st => {
                         const query = mantenimientoStudentSearch.trim().toLowerCase();
                         const matchesSearch = !query || 
                           (st.nombre_completo || '').toLowerCase().includes(query) || 
                           (st.rut || '').toLowerCase().includes(query) || 
                           (st.correo || '').toLowerCase().includes(query);
                         const matchesCurso = mantenimientoCursoFilter === 'all' || st.curso_actual === mantenimientoCursoFilter;
-                        return matchesSearch && matchesCurso;
-                      }).map(st => (
-                        <tr key={st.id}>
+                        const matchesEstado = mantenimientoEstadoFilter === 'all' || getStudentStatusString(st) === mantenimientoEstadoFilter;
+                        return matchesSearch && matchesCurso && matchesEstado;
+                      });
+
+                      if (filteredStudentsMantenimiento.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan="7" style={{ textAlign: 'center', padding: '24px', color: 'var(--text-secondary)' }}>
+                              No se encontraron alumnos con los filtros actuales.
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return filteredStudentsMantenimiento.map(st => (
+                        <tr key={st.id} className={mantenimientoSelectedStudents.includes(st.id) ? 'selected-row' : ''} style={{ backgroundColor: mantenimientoSelectedStudents.includes(st.id) ? 'rgba(59, 130, 246, 0.05)' : '' }}>
+                          <td>
+                            <input 
+                              type="checkbox" 
+                              checked={mantenimientoSelectedStudents.includes(st.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setMantenimientoSelectedStudents(prev => [...prev, st.id]);
+                                } else {
+                                  setMantenimientoSelectedStudents(prev => prev.filter(id => id !== st.id));
+                                }
+                              }}
+                            />
+                          </td>
                           <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{st.rut}</td>
                           <td><strong>{st.nombre_completo}</strong></td>
                           <td>{st.correo}</td>
                           <td>{st.curso_actual}</td>
                           <td>
                             {(() => {
-                              const stPosts = postulaciones.filter(p => p.alumno_id === st.id);
-                              const stModRecord = eleccionesModalidad.find(m => m.alumno_id === st.id);
-                              const studentModality = stModRecord ? stModRecord.modalidad : null;
-                              const isTP = studentModality === 'tecnico_profesional_gastronomia';
-                              const hasSubmitted = isTP || stPosts.length > 0;
+                              const isTP = getStudentStatusString(st) === 'TP';
+                              const hasSubmitted = getStudentStatusString(st) === 'Enviado (CH)';
+                              const isEligiendo = getStudentStatusString(st) === 'Eligiendo';
                               
                               if (isTP) {
                                 return <span className="status-pill available" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>TP</span>;
                               } else if (hasSubmitted) {
                                 return <span className="status-pill available" style={{ fontSize: '10px', padding: '2px 6px' }}>Enviado (CH)</span>;
-                              } else if (studentModality === 'cientifico_humanista') {
+                              } else if (isEligiendo) {
                                 return <span className="status-pill full" style={{ fontSize: '10px', padding: '2px 6px', backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>Eligiendo</span>;
                               } else {
                                 return <span className="status-pill full" style={{ fontSize: '10px', padding: '2px 6px' }}>Pendiente</span>;
@@ -3876,8 +4031,8 @@ export default function AdminDashboard() {
                             </button>
                           </td>
                         </tr>
-                      ))
-                    )}
+                      ));
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -4947,6 +5102,82 @@ export default function AdminDashboard() {
                   {isSubmittingManualInscription ? 'Guardando...' : 'Inscribir Alumno'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {showAddStudentModal && (
+          <div className="laap-modal-backdrop">
+            <div className="laap-modal-card animate-scaleIn" style={{ maxWidth: '500px', width: '100%' }}>
+              <div className="modal-header">
+                <h2>Añadir Estudiante</h2>
+                <button className="btn-close-modal" onClick={() => setShowAddStudentModal(false)}><MailX size={18} /></button>
+              </div>
+              <form onSubmit={handleAddStudent} className="modal-body">
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold' }}>RUT (Sin puntos, con guión) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej: 12345678-9"
+                    value={newStudentData.rut}
+                    onChange={(e) => setNewStudentData({ ...newStudentData, rut: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  />
+                  <small style={{ color: 'var(--text-secondary)' }}>El sistema lo formateará automáticamente (Ej: 12.345.678-9).</small>
+                </div>
+                
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Nombre Completo *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej: Juan Pérez"
+                    value={newStudentData.nombre_completo}
+                    onChange={(e) => setNewStudentData({ ...newStudentData, nombre_completo: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Correo Institucional</label>
+                  <input
+                    type="email"
+                    placeholder="Ej: juan.perez@colegio.cl"
+                    value={newStudentData.correo}
+                    onChange={(e) => setNewStudentData({ ...newStudentData, correo: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Curso Actual *</label>
+                  <select
+                    required
+                    value={newStudentData.curso_actual}
+                    onChange={(e) => setNewStudentData({ ...newStudentData, curso_actual: e.target.value })}
+                    style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="">Seleccione un curso</option>
+                    <option value="3° Medio A">3° Medio A</option>
+                    <option value="3° Medio B">3° Medio B</option>
+                    <option value="3° Medio C">3° Medio C</option>
+                    <option value="3° Medio D">3° Medio D</option>
+                    <option value="4° Medio A">4° Medio A</option>
+                    <option value="4° Medio B">4° Medio B</option>
+                    <option value="4° Medio C">4° Medio C</option>
+                    <option value="4° Medio D">4° Medio D</option>
+                  </select>
+                </div>
+
+                <div className="modal-actions" style={{ marginTop: '24px' }}>
+                  <button type="button" className="laap-btn-text" onClick={() => setShowAddStudentModal(false)} disabled={isAddingStudent}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="laap-btn-primary" disabled={isAddingStudent}>
+                    {isAddingStudent ? 'Guardando...' : 'Guardar Estudiante'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
