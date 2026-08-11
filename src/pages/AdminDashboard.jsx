@@ -2428,56 +2428,73 @@ export default function AdminDashboard() {
         {activeTab === 'lista_espera' && (
           <div className="admin-tab-content animate-fadeIn">
             <div className="admin-section-card">
-              <div className="card-filter-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
                   <h2>Alumnos Registrados en Lista de Espera</h2>
                   <p style={{ margin: 0 }}>Seguimiento de estudiantes en cola de espera por falta de vacante.</p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div className="search-box">
-                    <Search size={16} />
-                    <input
-                      type="text"
-                      placeholder="Buscar por nombre, RUT o correo..."
-                      value={waitlistTableSearchQuery}
-                      onChange={(e) => setWaitlistTableSearchQuery(e.target.value)}
-                      style={{ width: '220px' }}
-                    />
-                  </div>
-                  <button
-                    className="laap-btn-primary"
-                    onClick={() => {
-                      setWaitlistSearchQuery('');
-                      setManualWaitlistStudent(null);
-                      setShowManualWaitlistModal(true);
-                    }}
-                    style={{ height: '37px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <Clock size={16} />
-                    <span>+ Añadir a Espera</span>
-                  </button>
-                  <label htmlFor="waitlistLevelFilter" style={{ fontWeight: 'bold', marginLeft: '10px', marginRight: '6px' }}>Nivel:</label>
-                    <select
-                      id="waitlistLevelFilter"
-                      value={waitlistLevelFilter}
-                      onChange={(e) => setWaitlistLevelFilter(e.target.value)}
-                      style={{
-                        padding: '8px 12px',
-                        borderRadius: '6px',
-                        border: '1px solid var(--border-color)',
-                        backgroundColor: 'var(--bg-input)',
-                        color: 'var(--text-primary)',
-                        fontSize: '13px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <option value="all">Todos</option>
-                      <option value="3M">3° Medio (Para actuales 2dos)</option>
-                      <option value="4M">4° Medio (Para actuales 3ros)</option>
-                    </select>
+                <button
+                  className="laap-btn-primary"
+                  onClick={() => {
+                    setWaitlistSearchQuery('');
+                    setManualWaitlistStudent(null);
+                    setShowManualWaitlistModal(true);
+                  }}
+                  style={{ height: '37px', padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <Clock size={16} />
+                  <span>+ Añadir a Espera</span>
+                </button>
+              </div>
 
-                    <label htmlFor="waitlistFilter" style={{ fontWeight: 'bold', marginLeft: '10px' }}>Filtrar por Asignatura:</label>
+              <div style={{
+                display: 'flex',
+                gap: '16px',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '20px',
+                marginTop: '16px'
+              }}>
+                <div className="search-box">
+                  <Search size={16} />
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre, RUT o correo..."
+                    value={waitlistTableSearchQuery}
+                    onChange={(e) => setWaitlistTableSearchQuery(e.target.value)}
+                    style={{ width: '220px' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label htmlFor="waitlistLevelFilter" style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-secondary)' }}>Nivel:</label>
+                  <select
+                    id="waitlistLevelFilter"
+                    value={waitlistLevelFilter}
+                    onChange={(e) => setWaitlistLevelFilter(e.target.value)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: 'var(--bg-input)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="all">Todos</option>
+                    <option value="3M">3° Medio (Para actuales 2dos)</option>
+                    <option value="4M">4° Medio (Para actuales 3ros)</option>
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label htmlFor="waitlistFilter" style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--text-secondary)' }}>Filtrar por Asignatura:</label>
                   <select
                     id="waitlistFilter"
                     value={waitlistFilter}
