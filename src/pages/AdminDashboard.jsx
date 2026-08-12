@@ -1834,7 +1834,10 @@ export default function AdminDashboard() {
   });
 
   const totalStudentsCount = filteredStudentsForStats.length;
-  const completedStudentsCount = filteredStudentsForStats.filter(st => postulaciones.some(p => p.alumno_id === st.id)).length;
+  const completedStudentsCount = filteredStudentsForStats.filter(st => 
+    postulaciones.some(p => p.alumno_id === st.id) || 
+    eleccionesModalidad.some(m => m.alumno_id === st.id && m.modalidad === 'tecnico_profesional_gastronomia')
+  ).length;
   const pendingStudentsCount = totalStudentsCount - completedStudentsCount;
   const participationRate = totalStudentsCount > 0 ? Math.round((completedStudentsCount / totalStudentsCount) * 100) : 0;
 
